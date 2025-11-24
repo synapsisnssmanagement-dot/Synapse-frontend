@@ -22,7 +22,7 @@ const AllCoordinators = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        "https://synapse-backend-ijri.onrender.com/admin/dashboardata",
+        "https://synapse-backend-ijri.onrender.com/api/admin/dashboardata",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStats(res.data.Data.coordinator);
@@ -36,7 +36,7 @@ const AllCoordinators = () => {
   const fetchCoordinators = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/getallcoordinator",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/getallcoordinator",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setCoordinators(res.data.coordinator || []);
@@ -50,7 +50,7 @@ const AllCoordinators = () => {
 
     try {
       await axios.put(
-        `http://localhost:3000/api/coordinator/approvecoordinator/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/approvecoordinator/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -66,7 +66,7 @@ const AllCoordinators = () => {
 
     try {
       await axios.put(
-        `http://localhost:3000/api/coordinator/rejectcoordinatorindahboard/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/rejectcoordinatorindahboard/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -22,7 +22,7 @@ const AllStudent = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        "https://synapse-backend-ijri.onrender.com/admin/dashboardata",
+        "https://synapse-backend-ijri.onrender.com/api/admin/dashboardata",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStats(res.data.Data.student);
@@ -36,7 +36,7 @@ const AllStudent = () => {
   const fetchAllStudents = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/students/getallstudent",
+        "https://synapse-backend-ijri.onrender.com/api/students/getallstudent",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStudents(res.data.students || []);
@@ -50,7 +50,7 @@ const AllStudent = () => {
       return;
     try {
       await axios.put(
-        `http://localhost:3000/api/students/approvependingstudent/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/students/approvependingstudent/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -66,7 +66,7 @@ const AllStudent = () => {
       return;
     try {
       await axios.put(
-        `http://localhost:3000/api/students/rejectinallstudent/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/students/rejectinallstudent/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
