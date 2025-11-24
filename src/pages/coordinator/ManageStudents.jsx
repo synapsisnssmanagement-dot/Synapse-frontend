@@ -15,7 +15,7 @@ const ManageStudents = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/students",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/students",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStudents(res.data.students || []);
@@ -36,7 +36,7 @@ const ManageStudents = () => {
     try {
       setLoading(true);
       const res = await axios.post(
-        `http://localhost:3000/api/coordinator/getstudentbyskill/${searchTerm}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/getstudentbyskill/${searchTerm}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

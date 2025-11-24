@@ -10,7 +10,7 @@ const EventAlbum = () => {
     const fetchImages = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/events/getalleventimage"
+          "https://synapse-backend-ijri.onrender.com/api/events/getalleventimage"
         );
         setImages(res.data.images);
       } catch (err) {

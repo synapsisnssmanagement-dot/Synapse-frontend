@@ -18,7 +18,7 @@ const AlumniTestimonials = () => {
       const token = localStorage.getItem("token");
 
       const res = await axios.post(
-        "http://localhost:3000/api/alumni/testimonial",
+        "https://synapse-backend-ijri.onrender.com/api/alumni/testimonial",
         { message },
         {
           headers: {

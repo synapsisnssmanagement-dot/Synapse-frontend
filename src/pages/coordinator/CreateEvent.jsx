@@ -169,7 +169,7 @@ const CreateEvent = () => {
     const fetchCoordinator = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/coordinator/profile",
+          "https://synapse-backend-ijri.onrender.com/api/coordinator/profile",
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -212,7 +212,7 @@ const CreateEvent = () => {
       if (image) form.append("images", image);
 
       const res = await axios.post(
-        "http://localhost:3000/api/coordinator/createevents",
+        "https://synapse-backend-ijri.onrender.com/coordinator/createevents",
         form,
         {
           headers: {

@@ -28,7 +28,7 @@ const MyProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/api/students/profile", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/students/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -80,7 +80,7 @@ const MyProfile = () => {
       if (imageFile) data.append("profileImage", imageFile);
 
       const res = await axios.put(
-        "http://localhost:3000/api/students/profile/edit",
+        "https://synapse-backend-ijri.onrender.com/api/students/profile/edit",
         data,
         {
           headers: {

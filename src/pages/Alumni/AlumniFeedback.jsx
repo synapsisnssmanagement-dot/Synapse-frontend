@@ -11,7 +11,7 @@ const AlumniFeedback = () => {
   const loadFeedbacks = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/mentorship/mentee-feedback/all",
+        "https://synapse-backend-ijri.onrender.com/api/mentorship/mentee-feedback/all",
         {
           headers: { Authorization: `Bearer ${token}` },
         }

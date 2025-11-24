@@ -13,7 +13,7 @@ const EventDisplay = () => {
 
   const getAllEvents = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/events/getallevent");
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/events/getallevent");
       setEvents(res.data.events.slice(0, 3));
     } catch (err) {
       console.error("Error fetching events:", err);

@@ -13,7 +13,7 @@ const TeacherProfile = () => {
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get("http://localhost:3000/api/teacher/profile", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/teacher/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setProfile(res.data.teacher);

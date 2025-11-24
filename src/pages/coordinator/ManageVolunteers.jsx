@@ -24,7 +24,7 @@ const ManageVolunteers = () => {
   const fetchVolunteers = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/volunteers",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/volunteers",
         axiosConfig
       );
       setVolunteers(res.data.volunteers || []);
@@ -37,7 +37,7 @@ const ManageVolunteers = () => {
   const fetchEvents = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/my-events",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/my-events",
         axiosConfig
       );
       setEvents(res.data.events || []);
@@ -50,7 +50,7 @@ const ManageVolunteers = () => {
     if (!eventId) return;
     try {
       const res = await axios.get(
-        `http://localhost:3000/api/coordinator/events/${eventId}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/events/${eventId}`,
         axiosConfig
       );
       setAssignedVolunteers(res.data?.event?.participants || []);

@@ -22,7 +22,7 @@ const ManageInstitute = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        "http://localhost:3000/api/institution/allinstitutebyadmin",
+        "https://synapse-backend-ijri.onrender.com/api/institution/allinstitutebyadmin",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setInstitutions(data.institutions || []);
@@ -46,13 +46,13 @@ const ManageInstitute = () => {
     try {
       if (editData) {
         await axios.put(
-          `http://localhost:3000/api/institution/${editData._id}`,
+          `https://synapse-backend-ijri.onrender.com/api/institution/${editData._id}`,
           form,
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         await axios.post(
-          "http://localhost:3000/api/institution/create",
+          "https://synapse-backend-ijri.onrender.com/api/institution/create",
           form,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -70,7 +70,7 @@ const ManageInstitute = () => {
     if (!window.confirm("Are you sure you want to delete this institution?"))
       return;
     try {
-      await axios.delete(`http://localhost:3000/api/institution/${id}`, {
+      await axios.delete(`https://synapse-backend-ijri.onrender.com/api/institution/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchInstitutions();

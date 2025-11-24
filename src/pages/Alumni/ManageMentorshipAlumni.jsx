@@ -12,7 +12,7 @@ const ManageMentorshipAlumni = () => {
 
   const fetchRequests = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/mentorship/mentor", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/mentorship/mentor", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setRequests(res.data.requests || []);
@@ -28,7 +28,7 @@ const ManageMentorshipAlumni = () => {
   const respond = async (id, status) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/mentorship/${id}/respond`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/${id}/respond`,
         { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -42,7 +42,7 @@ const ManageMentorshipAlumni = () => {
   const startSession = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/mentorship/${id}/start`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/${id}/start`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -56,7 +56,7 @@ const ManageMentorshipAlumni = () => {
   const endSession = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/mentorship/${id}/end`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/${id}/end`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -78,7 +78,7 @@ const ManageMentorshipAlumni = () => {
 
     try {
       await axios.put(
-        `http://localhost:3000/api/mentorship/${currentId}/meeting-link`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/${currentId}/meeting-link`,
         { link: meetingLink },
         { headers: { Authorization: `Bearer ${token}` } }
       );

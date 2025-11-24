@@ -13,7 +13,7 @@ const MessagePanel = ({ event, socket }) => {
     const fetchMessages = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:3000/api/chat/events/${event._id}/messages`,
+          `https://synapse-backend-ijri.onrender.com/api/chat/events/${event._id}/messages`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -45,7 +45,7 @@ const MessagePanel = ({ event, socket }) => {
 
     try {
       const res = await axios.post(
-        `http://localhost:3000/api/chat/coordinator/send`,
+        `https://synapse-backend-ijri.onrender.com/api/chat/coordinator/send`,
         msgData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

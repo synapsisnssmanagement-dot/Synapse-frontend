@@ -18,7 +18,7 @@ const AdminProfile = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem("token");
-        const res = await axios.get("http://localhost:3000/api/admin/profile", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/admin/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setProfile(res.data.admin);

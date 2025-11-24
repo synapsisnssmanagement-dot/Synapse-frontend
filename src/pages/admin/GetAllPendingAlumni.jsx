@@ -16,7 +16,7 @@ const GetAllPendingAlumni = () => {
         return;
       }
 
-      const res = await axios.get("http://localhost:3000/api/alumni/pending", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/alumni/pending", {
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log(res.data)
@@ -33,7 +33,7 @@ const GetAllPendingAlumni = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.put(
-        `http://localhost:3000/api/alumni/approve/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/alumni/approve/${id}`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },

@@ -41,7 +41,7 @@ const PaymentModal = ({ event, onClose }) => {
       setProcessing(true);
 
       const res = await axios.post(
-        "http://localhost:3000/api/donations/create-intent",
+        "https://synapse-backend-ijri.onrender.com/api/donations/create-intent",
         { amount, eventId: event._id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -60,7 +60,7 @@ const PaymentModal = ({ event, onClose }) => {
 
       if (result.paymentIntent.status === "succeeded") {
         await axios.post(
-          "http://localhost:3000/api/donations/save",
+          "https://synapse-backend-ijri.onrender.com/api/donations/save",
           {
             eventId: event._id,
             amount,

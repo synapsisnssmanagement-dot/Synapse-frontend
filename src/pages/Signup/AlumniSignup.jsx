@@ -215,7 +215,7 @@ const AlumniSignup = () => {
     const fetchInstitutions = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/institution/getallinstitutes"
+          "https://synapse-backend-ijri.onrender.com/api/institution/getallinstitutes"
         );
         setInstitutions(res.data.institutions);
       } catch (err) {
@@ -246,7 +246,7 @@ const AlumniSignup = () => {
 
     try {
       const res = await axios.post(
-        "http://localhost:3000/api/alumni/signup",
+        "https://synapse-backend-ijri.onrender.com/api/alumni/signup",
         fd,
         { headers: { "Content-Type": "multipart/form-data" } }
       );

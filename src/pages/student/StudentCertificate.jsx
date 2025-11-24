@@ -19,7 +19,7 @@ const StudentCertificate = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.get(
-          "http://localhost:3000/api/students/my-events",
+          "https://synapse-backend-ijri.onrender.com/api/students/my-events",
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -40,7 +40,7 @@ const StudentCertificate = () => {
       const token = localStorage.getItem("token");
 
       const response = await axios.get(
-        `http://localhost:3000/api/students/generate/${eventId}`,
+        `https://synapse-backend-ijri.onrender.com/api/students/generate/${eventId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",

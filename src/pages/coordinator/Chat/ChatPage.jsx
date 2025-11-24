@@ -6,7 +6,7 @@ import MessagePanel from "./MessagePanel";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const socket = io("http://localhost:3000", {
+const socket = io("https://synapse-backend-ijri.onrender.com", {
   transports: ["websocket", "polling"],
 });
 
@@ -19,7 +19,7 @@ const ChatPage = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/api/coordinator/my-events", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/coordinator/my-events", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setEvents(res.data.events || []);

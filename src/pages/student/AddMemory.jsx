@@ -17,7 +17,7 @@ const AddMemoryPremium = () => {
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/students/my-events", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/students/my-events", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setEvents(res.data?.events || []);
@@ -52,7 +52,7 @@ const AddMemoryPremium = () => {
 
     try {
       await axios.post(
-        `http://localhost:3000/api/students/${selectedEvent.id}/uploadimagesbystudent`,
+        `https://synapse-backend-ijri.onrender.com/api/students/${selectedEvent.id}/uploadimagesbystudent`,
         formData,
         {
           headers: {

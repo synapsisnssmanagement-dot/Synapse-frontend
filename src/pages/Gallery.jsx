@@ -14,7 +14,7 @@ const Gallery = () => {
   const getImages = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/events/getalleventimage"
+        "https://synapse-backend-ijri.onrender.com/api/events/getalleventimage"
       );
       if (res.data.success) {
         // Limit to 4 images only

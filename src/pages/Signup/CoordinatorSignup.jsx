@@ -382,7 +382,7 @@ const CoordinatorSignup = () => {
     const fetchInstitutions = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/institution/getallinstitutes"
+          "https://synapse-backend-ijri.onrender.com/api/institution/getallinstitutes"
         );
         setInstitutions(res.data.institutions);
       } catch (err) {
@@ -411,7 +411,7 @@ const CoordinatorSignup = () => {
 
     try {
       const res = await axios.post(
-        "http://localhost:3000/api/coordinator/coordinatorsignup",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/coordinatorsignup",
         fd,
         { headers: { "Content-Type": "multipart/form-data" } }
       );

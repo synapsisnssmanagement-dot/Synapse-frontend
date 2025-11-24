@@ -13,7 +13,7 @@ const GetAllPendingStudent = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        `http://localhost:3000/api/students/getallpendingstudent`,
+        `https://synapse-backend-ijri.onrender.com/api/students/getallpendingstudent`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -31,7 +31,7 @@ const GetAllPendingStudent = () => {
       return;
     try {
       await axios.put(
-        `http://localhost:3000/api/students/approvependingstudent/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/students/approvependingstudent/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -46,7 +46,7 @@ const GetAllPendingStudent = () => {
     if (!window.confirm("Are you sure you want to reject this student")) return;
     try {
       await axios.put(
-        `http://localhost:3000/api/students/rejectstuedent/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/students/rejectstuedent/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

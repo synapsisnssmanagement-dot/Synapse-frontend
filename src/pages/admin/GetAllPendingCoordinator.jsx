@@ -13,7 +13,7 @@ const GetAllPendingCoordinator = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/getallpendingcoordinator",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/getallpendingcoordinator",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setCoordinators(res.data.coordinator);
@@ -27,7 +27,7 @@ const GetAllPendingCoordinator = () => {
   const handleApprove = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/coordinator/approvecoordinator/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/approvecoordinator/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -41,7 +41,7 @@ const GetAllPendingCoordinator = () => {
   const handleReject = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/coordinator/rejectcoordinator/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/rejectcoordinator/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

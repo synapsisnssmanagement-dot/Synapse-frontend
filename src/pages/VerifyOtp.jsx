@@ -87,7 +87,7 @@ const VerifyOtp = () => {
     }
 
     try {
-      const res = await axios.post("http://localhost:3000/api/otp/verify-otp", {
+      const res = await axios.post("https://synapse-backend-ijri.onrender.com/api/otp/verify-otp", {
         id,
         otp,
         role,

@@ -35,7 +35,7 @@ const MyEventsTeacher = () => {
   const fetchEvents = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:3000/api/teacher/teachermyevents", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/teacher/teachermyevents", {
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log(res.data)
@@ -72,7 +72,7 @@ const MyEventsTeacher = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.put(
-        `http://localhost:3000/api/teacher/${selectedEvent._id}/edit`,
+        `https://synapse-backend-ijri.onrender.com/api/teacher/${selectedEvent._id}/edit`,
         editForm,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -102,7 +102,7 @@ const MyEventsTeacher = () => {
       setUploading(true);
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        `http://localhost:3000/api/teacher/${selectedEvent._id}/uploadimages`,
+        `https://synapse-backend-ijri.onrender.com/api/teacher/${selectedEvent._id}/uploadimages`,
         formData,
         {
           headers: {

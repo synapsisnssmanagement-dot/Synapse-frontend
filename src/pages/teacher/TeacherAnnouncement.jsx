@@ -11,7 +11,7 @@ const TeacherAnnouncement = () => {
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/notification", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/notification", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -31,7 +31,7 @@ const TeacherAnnouncement = () => {
   const markAsRead = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/notification/read/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/notification/read/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -48,7 +48,7 @@ const TeacherAnnouncement = () => {
   const markAll = async () => {
     try {
       await axios.put(
-        "http://localhost:3000/api/notification/read-all",
+        "https://synapse-backend-ijri.onrender.com/api/notification/read-all",
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -62,7 +62,7 @@ const TeacherAnnouncement = () => {
   // Delete one notification
   const deleteOne = async (id) => {
     try {
-      await axios.delete(`http://localhost:3000/api/notification/${id}`, {
+      await axios.delete(`https://synapse-backend-ijri.onrender.com/api/notification/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -75,7 +75,7 @@ const TeacherAnnouncement = () => {
   // Delete all notifications
   const deleteAll = async () => {
     try {
-      await axios.delete("http://localhost:3000/api/notification", {
+      await axios.delete("https://synapse-backend-ijri.onrender.com/api/notification", {
         headers: { Authorization: `Bearer ${token}` },
       });
 

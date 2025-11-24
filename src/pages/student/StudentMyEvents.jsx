@@ -28,7 +28,7 @@ const StudentMyEvents = () => {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:3000/api/students/events/filter", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/students/events/filter", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = res.data?.events || [];

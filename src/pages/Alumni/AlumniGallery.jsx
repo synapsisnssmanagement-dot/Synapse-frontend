@@ -14,7 +14,7 @@ const AlumniGallery = () => {
     const fetchImages = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/alumni/allinstituteimages",
+          "https://synapse-backend-ijri.onrender.com/api/alumni/allinstituteimages",
           {
             headers: {
               Authorization: `Bearer ${token}`,

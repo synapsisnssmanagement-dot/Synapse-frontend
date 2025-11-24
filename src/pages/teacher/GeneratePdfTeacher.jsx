@@ -14,7 +14,7 @@ const GeneratePdfTeacher = () => {
   const [events, setEvents] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
 
-  const API_BASE = "http://localhost:3000/api"; // Update if needed
+  const API_BASE = "https://synapse-backend-ijri.onrender.com/api"; // Update if needed
 
   useEffect(() => {
     const fetchEvents = async () => {

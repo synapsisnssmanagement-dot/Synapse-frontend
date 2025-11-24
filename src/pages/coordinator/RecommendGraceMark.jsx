@@ -14,7 +14,7 @@ const RecommendGraceMark = () => {
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
-    baseURL: "http://localhost:3000/api/coordinator",
+    baseURL: "https://synapse-backend-ijri.onrender.com/api/coordinator",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

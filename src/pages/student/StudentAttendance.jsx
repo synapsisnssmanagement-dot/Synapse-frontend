@@ -20,7 +20,7 @@ const StudentAttendance = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/api/students/my-events", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/students/my-events", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setEvents(res.data.events || []);
@@ -39,7 +39,7 @@ const StudentAttendance = () => {
       for (const ev of events) {
         try {
           const res = await axios.get(
-            `http://localhost:3000/api/students/event/${ev._id}/attendance`,
+            `https://synapse-backend-ijri.onrender.com/api/students/event/${ev._id}/attendance`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
           attendanceMap[ev._id] = res.data.attendance;

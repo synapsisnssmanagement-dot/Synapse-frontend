@@ -11,7 +11,7 @@ const AttendanceByTeacher = () => {
   const [attendance, setAttendance] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const API_BASE = "http://localhost:3000/api";
+  const API_BASE = "https://synapse-backend-ijri.onrender.com/api";
 
   // ✅ Fetch events for logged-in teacher
   useEffect(() => {

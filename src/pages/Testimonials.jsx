@@ -13,7 +13,7 @@ const Testimonials = () => {
 
   const getAllTestimonial = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/alumni/testimonials/top");
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/alumni/testimonials/top");
       setData(res.data.testimonials);
       console.log(res.data)
     } catch (error) {

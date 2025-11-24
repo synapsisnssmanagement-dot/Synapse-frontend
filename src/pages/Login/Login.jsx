@@ -22,11 +22,11 @@ const Login = () => {
     setMessage("");
 
     const loginEndpoints = [
-      { role: "admin", url: "http://localhost:3000/api/admin/login" },
-      { role: "coordinator", url: "http://localhost:3000/api/coordinator/logincoordinator" },
-      { role: "student", url: "http://localhost:3000/api/students/studentlogin" },
-      { role: "teacher", url: "http://localhost:3000/api/teacher/login" },
-      { role: "alumni", url: "http://localhost:3000/api/alumni/login" },
+      { role: "admin", url: "https://synapse-backend-ijri.onrender.com/api/admin/login" },
+      { role: "coordinator", url: "https://synapse-backend-ijri.onrender.com/api/coordinator/logincoordinator" },
+      { role: "student", url: "https://synapse-backend-ijri.onrender.com/api/students/studentlogin" },
+      { role: "teacher", url: "https://synapse-backend-ijri.onrender.com/api/teacher/login" },
+      { role: "alumni", url: "https://synapse-backend-ijri.onrender.com/api/alumni/login" },
     ];
 
     let loggedIn = false;

@@ -32,7 +32,7 @@ const ManageEvents = () => {
   const fetchEvents = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/my-events",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/my-events",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setEvents(res.data.events);

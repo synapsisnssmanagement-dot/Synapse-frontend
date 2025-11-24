@@ -48,7 +48,7 @@ const CoordinatorDashboard = () => {
       }
 
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/coordinatordashboard",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/coordinatordashboard",
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -82,7 +82,7 @@ const CoordinatorDashboard = () => {
         Provide 3-4 short insights about performance, engagement, and suggestions.
       `;
 
-      const res = await axios.post("http://localhost:3000/api/ai/generate", {
+      const res = await axios.post("https://synapse-backend-ijri.onrender.com/api/ai/generate", {
         prompt,
       });
 

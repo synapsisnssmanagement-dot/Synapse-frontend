@@ -10,7 +10,7 @@ const StudentMentorshipList = () => {
   const loadMentorships = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/mentorshipmessage/allstudent",
+        "https://synapse-backend-ijri.onrender.com/api/mentorshipmessage/allstudent",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMentorships(res.data.mentorships || []);

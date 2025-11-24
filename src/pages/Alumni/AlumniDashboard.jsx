@@ -21,7 +21,7 @@ const AlumniDashboard = () => {
 
   const fetchDashboard = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/alumni/dashboard", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/alumni/dashboard", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDashboard(res.data.data);
@@ -35,7 +35,7 @@ const AlumniDashboard = () => {
   const fetchFeedbacks = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/mentorship/mentee-feedback/all",
+        "https://synapse-backend-ijri.onrender.com/api/mentorship/mentee-feedback/all",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setFeedbacks(res.data.feedbacks || []);

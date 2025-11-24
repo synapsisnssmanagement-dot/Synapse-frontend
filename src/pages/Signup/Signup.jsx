@@ -503,7 +503,7 @@ export default function StudentSignup() {
     const loadInstitutions = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/institution/getallinstitutes"
+          "https://synapse-backend-ijri.onrender.com/api/institution/getallinstitutes"
         );
         setInstitutions(res.data.institutions || []);
       } catch (err) {
@@ -534,7 +534,7 @@ export default function StudentSignup() {
       if (profileImage) fd.append("profileImage", profileImage);
 
       const res = await axios.post(
-        "http://localhost:3000/api/students/studentsignup",
+        "https://synapse-backend-ijri.onrender.com/api/students/studentsignup",
         fd,
         {
           headers: { "Content-Type": "multipart/form-data" },

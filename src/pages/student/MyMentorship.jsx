@@ -17,7 +17,7 @@ const MyMentorships = () => {
   // Load student mentorships
   const fetchMySessions = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/mentorship/student", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/mentorship/student", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSessions(res.data.sessions || []);
@@ -35,7 +35,7 @@ const MyMentorships = () => {
     if (!feedbackRating) return toast.error("Please select a rating");
     try {
       await axios.put(
-        `http://localhost:3000/api/mentorship/${selectedSession._id}/feedback`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/${selectedSession._id}/feedback`,
         { rating: feedbackRating, comment: feedbackComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -45,14 +45,14 @@ const TeacherDashboard = () => {
           return;
         }
 
-        const res = await axios.get("http://localhost:3000/api/teacher/overview", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/teacher/overview", {
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (res.data.success) {
           setOverview(res.data.data);
 
-          const recRes = await axios.get("http://localhost:3000/api/teacher/pending-recommendations", {
+          const recRes = await axios.get("https://synapse-backend-ijri.onrender.com/api/teacher/pending-recommendations", {
             headers: { Authorization: `Bearer ${token}` },
           });
 

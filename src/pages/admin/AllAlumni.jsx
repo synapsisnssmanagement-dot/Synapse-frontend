@@ -21,7 +21,7 @@ const AllAlumni = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:3000/api/alumni/", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/alumni/", {
         headers: { Authorization: `Bearer ${token}` },
       });
 

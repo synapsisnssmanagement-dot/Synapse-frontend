@@ -27,7 +27,7 @@ const CreateInstitution = () => {
     try {
       setLoading(true);
       const res = await axios.post(
-        "http://localhost:3000/api/institution/create",
+        "https://synapse-backend-ijri.onrender.com/api/institution/create",
         form,{headers:{Authorization:`Bearer ${token}`}}
       );
       toast.success(res.data.message || "Institution created successfully!");

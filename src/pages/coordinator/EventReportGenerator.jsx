@@ -13,7 +13,7 @@ const EventReportGenerator = () => {
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
-    baseURL: "http://localhost:3000/api/coordinator",
+    baseURL: "https://synapse-backend-ijri.onrender.com/api/coordinator",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -54,7 +54,7 @@ const EventReportGenerator = () => {
 
     try {
       const response = await axios.post(
-        `http://localhost:3000/api/coordinator/pdfgeneration/${selectedEvent._id}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/pdfgeneration/${selectedEvent._id}`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },

@@ -17,7 +17,7 @@ const AlumniProfile = () => {
 
   const fetchProfile = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/alumni/profile", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/alumni/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -53,7 +53,7 @@ const AlumniProfile = () => {
 
       if (newImage) formData.append("profileImage", newImage);
 
-      await axios.put("http://localhost:3000/api/alumni/profile", formData, {
+      await axios.put("https://synapse-backend-ijri.onrender.com/api/alumni/profile", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",

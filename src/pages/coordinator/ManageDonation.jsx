@@ -14,7 +14,7 @@ const ManageDonation = () => {
   const fetchEvents = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/my-events",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/my-events",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setEvents(res.data.events);
@@ -29,7 +29,7 @@ const ManageDonation = () => {
   const toggleDonation = async (eventId) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/coordinator/toggle-donation/${eventId}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/toggle-donation/${eventId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

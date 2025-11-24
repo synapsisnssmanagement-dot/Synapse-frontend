@@ -22,7 +22,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/api/students/dashboard", {
+        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/students/dashboard", {
           headers: { Authorization: `Bearer ${token}` },
         });
 

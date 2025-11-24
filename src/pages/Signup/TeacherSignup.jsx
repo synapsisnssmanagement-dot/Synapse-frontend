@@ -376,7 +376,7 @@ const TeacherSignup = () => {
     const fetchInstitutions = async () => {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/institution/getallinstitutes"
+          "https://synapse-backend-ijri.onrender.com/api/institution/getallinstitutes"
         );
         setInstitutions(res.data.institutions);
       } catch (err) {

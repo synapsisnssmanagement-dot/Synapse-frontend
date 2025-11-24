@@ -22,7 +22,7 @@ const AllCoordinators = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        "http://localhost:3000/api/admin/dashboardata",
+        "https://synapse-backend-ijri.onrender.com/admin/dashboardata",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStats(res.data.Data.coordinator);

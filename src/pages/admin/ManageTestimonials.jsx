@@ -11,7 +11,7 @@ const ManageTestimonials = () => {
   const fetchTestimonials = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/alumni/testimonials",
+        "https://synapse-backend-ijri.onrender.com/api/alumni/testimonials",
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -32,7 +32,7 @@ const ManageTestimonials = () => {
   const updateVisibility = async (alumniId, testimonialId, visibility) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/alumni/${alumniId}/testimonial/${testimonialId}/visibility`,
+        `https://synapse-backend-ijri.onrender.com/api/alumni/${alumniId}/testimonial/${testimonialId}/visibility`,
         { visibility },
         {
           headers: { Authorization: `Bearer ${token}` },

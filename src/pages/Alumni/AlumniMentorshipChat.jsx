@@ -5,7 +5,7 @@ import EmojiPicker from "emoji-picker-react";
 import { useParams } from "react-router-dom";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:3000/mentorship-chat", {
+const socket = io("https://synapse-backend-ijri.onrender.com/mentorship-chat", {
   transports: ["websocket"],
   auth: { token: localStorage.getItem("token") },
 });
@@ -25,7 +25,7 @@ const AlumniMentorshipChat = () => {
   const loadMessages = async () => {
     try {
       const res = await axios.get(
-        `http://localhost:3000/api/mentorshipmessage/alumnichat/${mentorshipId}`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorshipmessage/alumnichat/${mentorshipId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

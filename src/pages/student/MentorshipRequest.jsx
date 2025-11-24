@@ -14,7 +14,7 @@ const MentorshipRequest = () => {
   // Fetch mentors of student's institution
   const fetchMentors = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/mentorship/mentors", {
+      const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/mentorship/mentors", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMentors(res.data.mentors || []);
@@ -36,7 +36,7 @@ const MentorshipRequest = () => {
 
     try {
       await axios.post(
-        "http://localhost:3000/api/mentorship/request",
+        "https://synapse-backend-ijri.onrender.com/api/mentorship/request",
         {
           mentorId: selectedMentor._id,
           topic,

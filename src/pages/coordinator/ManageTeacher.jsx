@@ -30,7 +30,7 @@ const ManageTeacher = () => {
   const fetchTeachers = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/teachers",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/teachers",
         axiosConfig
       );
       setTeachers(res.data.teachers || []);

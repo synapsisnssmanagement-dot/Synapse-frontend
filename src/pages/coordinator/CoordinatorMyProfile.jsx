@@ -11,7 +11,7 @@ const CoordinatorMyProfile = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const API_BASE_URL = "http://localhost:3000/api/coordinator";
+  const API_BASE_URL = "https://synapse-backend-ijri.onrender.com/api/coordinator";
 
   // Load profile
   useEffect(() => {
