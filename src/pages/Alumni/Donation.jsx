@@ -179,7 +179,7 @@ const Donation = () => {
   const fetchEvents = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/alumni/getalleventsalumniinstituition",
+        "https://synapse-backend-ijri.onrender.com/api/alumni/getalleventsalumniinstituition",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setEvents(res.data.events || []);
