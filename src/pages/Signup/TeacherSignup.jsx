@@ -407,7 +407,7 @@ const TeacherSignup = () => {
 
     try {
       const res = await axios.post(
-        "http://localhost:3000/api/teacher/signup",
+        "https://synapse-backend-ijri.onrender.com/api/teacher/signup",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );

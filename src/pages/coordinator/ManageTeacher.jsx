@@ -44,7 +44,7 @@ const ManageTeacher = () => {
   const fetchEvents = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:3000/api/coordinator/events",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/events",
         axiosConfig
       );
       setEvents(res.data.events || []);
@@ -69,7 +69,7 @@ const ManageTeacher = () => {
     try {
       setLoading(true);
       const res = await axios.post(
-        "http://localhost:3000/api/coordinator/assign-teacher",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/assign-teacher",
         {
           eventId: selectedEvent,
           teacherIds: [selectedTeacher],
@@ -94,7 +94,7 @@ const ManageTeacher = () => {
     try {
       setUnassigning(true);
       const res = await axios.delete(
-        "http://localhost:3000/api/coordinator/unassign-teacher",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/unassign-teacher",
         {
           headers: { Authorization: `Bearer ${token}` },
           data: { eventId, teacherId },

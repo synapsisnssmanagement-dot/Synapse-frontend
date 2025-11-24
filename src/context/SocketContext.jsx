@@ -9,7 +9,7 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem("token"); // use your stored login token if any
-    const newSocket = io("http://localhost:3000", {
+    const newSocket = io("https://synapse-backend-ijri.onrender.com", {
       auth: { token },
       transports: ["websocket"],
     });

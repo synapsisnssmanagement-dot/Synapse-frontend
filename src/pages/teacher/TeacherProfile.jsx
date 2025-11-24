@@ -55,7 +55,7 @@ const TeacherProfile = () => {
       }
 
       const res = await axios.put(
-        "http://localhost:3000/api/teacher/profile",
+        "https://synapse-backend-ijri.onrender.com/api/teacher/profile",
         form,
         {
           headers: {

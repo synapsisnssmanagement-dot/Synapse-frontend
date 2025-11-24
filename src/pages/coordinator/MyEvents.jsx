@@ -44,7 +44,7 @@ const ManageEvents = () => {
   const handleStart = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/events/${id}/start`,
+        `https://synapse-backend-ijri.onrender.com/api/events/${id}/start`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -58,7 +58,7 @@ const ManageEvents = () => {
   const handleComplete = async (id) => {
     try {
       await axios.put(
-        `http://localhost:3000/api/events/${id}/complete`,
+        `https://synapse-backend-ijri.onrender.com/api/events/${id}/complete`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -89,7 +89,7 @@ const ManageEvents = () => {
     e.preventDefault();
     try {
       await axios.put(
-        `http://localhost:3000/api/coordinator/events/${editingEvent._id}`,
+        `https://synapse-backend-ijri.onrender.com/api/coordinator/events/${editingEvent._id}`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

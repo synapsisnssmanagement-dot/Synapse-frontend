@@ -85,7 +85,7 @@ const ManageVolunteers = () => {
     try {
       setLoading(true);
       await axios.post(
-        "http://localhost:3000/api/coordinator/assignvolunteertoevents",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/assignvolunteertoevents",
         { eventId: selectedEvent, volunteerIds: selectedVolunteers },
         axiosConfig
       );
@@ -109,7 +109,7 @@ const ManageVolunteers = () => {
     try {
       setLoading(true);
       await axios.post(
-        "http://localhost:3000/api/coordinator/unassign-volunteers",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/unassign-volunteers",
         { eventId: selectedEvent, volunteerIds: selectedVolunteers },
         axiosConfig
       );

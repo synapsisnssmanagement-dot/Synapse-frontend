@@ -80,7 +80,7 @@ const Login = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:3000/api/auth/google";
+    window.location.href = "https://synapse-backend-ijri.onrender.com/api/auth/google";
   };
 
   useEffect(() => {

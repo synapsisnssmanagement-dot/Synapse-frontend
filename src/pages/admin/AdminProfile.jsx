@@ -45,7 +45,7 @@ const AdminProfile = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      await axios.put("http://localhost:3000/api/admin/profile", formData, {
+      await axios.put("https://synapse-backend-ijri.onrender.com/api/admin/profile", formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success("Profile updated successfully!");

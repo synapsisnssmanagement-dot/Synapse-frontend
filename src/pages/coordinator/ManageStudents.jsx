@@ -54,7 +54,7 @@ const ManageStudents = () => {
   const handleStudentToVolunteer = async (studentId) => {
     try {
       await axios.post(
-        "http://localhost:3000/api/coordinator/studenttovolunteer",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/studenttovolunteer",
         { studentId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -69,7 +69,7 @@ const ManageStudents = () => {
   const handleVolunteerToStudent = async (studentId) => {
     try {
       await axios.post(
-        "http://localhost:3000/api/coordinator/volunteertostudent",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/volunteertostudent",
         { studentId },
         { headers: { Authorization: `Bearer ${token}` } }
       );

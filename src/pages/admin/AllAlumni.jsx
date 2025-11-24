@@ -64,7 +64,7 @@ const AllAlumni = () => {
 
     try {
       await axios.put(
-        `http://localhost:3000/api/alumni/approve/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/alumni/approve/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -80,7 +80,7 @@ const AllAlumni = () => {
 
     try {
       await axios.put(
-        `http://localhost:3000/api/alumni/reject-dashboard/${id}`,
+        `https://synapse-backend-ijri.onrender.com/api/alumni/reject-dashboard/${id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

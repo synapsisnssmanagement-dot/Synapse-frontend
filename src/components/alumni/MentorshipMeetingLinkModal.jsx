@@ -13,7 +13,7 @@ const MentorshipMeetingLinkModal = ({ mentorshipId, onClose }) => {
   const fetchLink = async () => {
     try {
       const res = await axios.get(
-        `http://localhost:3000/api/mentorship/mentor`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/mentor`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -45,7 +45,7 @@ const MentorshipMeetingLinkModal = ({ mentorshipId, onClose }) => {
 
     try {
       await axios.put(
-        `http://localhost:3000/api/mentorship/${mentorshipId}/meeting-link`,
+        `https://synapse-backend-ijri.onrender.com/api/mentorship/${mentorshipId}/meeting-link`,
         { link },
         {
           headers: { Authorization: `Bearer ${token}` },

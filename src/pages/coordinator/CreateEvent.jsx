@@ -212,7 +212,7 @@ const CreateEvent = () => {
       if (image) form.append("images", image);
 
       const res = await axios.post(
-        "https://synapse-backend-ijri.onrender.com/coordinator/createevents",
+        "https://synapse-backend-ijri.onrender.com/api/coordinator/createevents",
         form,
         {
           headers: {
