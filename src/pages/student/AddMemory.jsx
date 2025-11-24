@@ -52,7 +52,7 @@ const AddMemoryPremium = () => {
 
     try {
       await axios.post(
-        `https://synapse-backend-ijri.onrender.com/api/students/${selectedEvent.id}/uploadimagesbystudent`,
+        `https://synapse-backend-ijri.onrender.com/api/students/${selectedEvent._id}/uploadimagesbystudent`,
         formData,
         {
           headers: {
