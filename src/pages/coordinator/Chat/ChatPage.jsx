@@ -49,7 +49,7 @@ const ChatPage = () => {
 
       {/* Sidebar */}
       <motion.div
-        initial={{ x: -280 }}
+        initial={{ x: 0 }}
         animate={{ x: sidebarOpen ? 0 : -280 }}
         transition={{ duration: 0.25 }}
         className="
