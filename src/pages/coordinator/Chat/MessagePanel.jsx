@@ -78,7 +78,7 @@ const MessagePanel = ({ event, socket }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-gray-100 shadow-lg rounded-2xl overflow-hidden">
+    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-gray-100 shadow-lg rounded-2xl overflow-hidden relative">
 
       {/* Header */}
       <div className="p-4 border-b bg-green-700 text-white flex items-center justify-between">
@@ -124,13 +124,12 @@ const MessagePanel = ({ event, socket }) => {
             );
           })
         )}
-
         <div ref={bottomRef} />
       </div>
 
-      {/* Emoji Picker */}
+      {/* Emoji Picker ABOVE THE BUTTON */}
       {showEmoji && (
-        <div className="absolute bottom-20 right-4 sm:right-6 z-20">
+        <div className="absolute bottom-[70px] left-3 sm:left-4 z-20">
           <EmojiPicker onEmojiClick={handleEmojiClick} />
         </div>
       )}
