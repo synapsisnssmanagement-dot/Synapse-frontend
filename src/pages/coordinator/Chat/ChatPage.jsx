@@ -3,7 +3,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 import EventList from "./EventList";
 import MessagePanel from "./MessagePanel";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { MessageSquare, Loader2, PanelLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const socket = io("https://synapse-backend-ijri.onrender.com", {
@@ -14,14 +14,17 @@ const ChatPage = () => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [openMobileSidebar, setOpenMobileSidebar] = useState(false);
+
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/coordinator/my-events", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await axios.get(
+          "https://synapse-backend-ijri.onrender.com/api/coordinator/my-events",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         setEvents(res.data.events || []);
       } catch (err) {
         console.error("Error fetching events:", err);
@@ -33,13 +36,22 @@ const ChatPage = () => {
   }, [token]);
 
   return (
-    <div className="relative h-[85vh] w-full rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-green-50 via-white to-green-100 border border-green-200 flex backdrop-blur-sm">
-      {/* Left Sidebar - Event List */}
+    <div className="relative h-[85vh] w-full rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-green-50 via-white to-green-100 border border-green-200 flex">
+
+      {/* ---------- MOBILE TOGGLE BUTTON ---------- */}
+      <button
+        className="sm:hidden absolute top-3 left-3 z-[60] bg-green-600 text-white p-2 rounded-full shadow-md"
+        onClick={() => setOpenMobileSidebar(true)}
+      >
+        <PanelLeft size={20} />
+      </button>
+
+      {/* ---------- DESKTOP SIDEBAR (always visible) ---------- */}
       <motion.div
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 80, damping: 15 }}
-        className="w-full sm:w-1/3 border-r border-green-200 bg-gradient-to-b from-white to-green-50/60 backdrop-blur-md"
+        className="hidden sm:block w-1/3 border-r border-green-200 bg-gradient-to-b from-white to-green-50/60 backdrop-blur-md"
       >
         {loading ? (
           <div className="flex flex-col h-full justify-center items-center text-green-600 gap-2">
@@ -49,13 +61,54 @@ const ChatPage = () => {
         ) : (
           <EventList
             events={events}
-            onSelect={setSelectedEvent}
+            onSelect={(ev) => {
+              setSelectedEvent(ev);
+            }}
             selected={selectedEvent}
           />
         )}
       </motion.div>
 
-      {/* Right Panel - Chat Window */}
+      {/* ---------- MOBILE SIDEBAR (drawer) ---------- */}
+      <AnimatePresence>
+        {openMobileSidebar && (
+          <motion.div
+            initial={{ x: -300 }}
+            animate={{ x: 0 }}
+            exit={{ x: -300 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 left-0 h-full w-72 bg-white z-[70] border-r border-green-200 shadow-2xl sm:hidden overflow-y-auto"
+          >
+            <div className="p-3 border-b flex justify-between items-center bg-green-600 text-white">
+              <h2 className="text-lg font-semibold">Your Events</h2>
+              <button
+                onClick={() => setOpenMobileSidebar(false)}
+                className="text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col h-full justify-center items-center text-green-600 gap-2">
+                <Loader2 className="animate-spin" size={28} />
+                <p className="text-sm">Loading your events...</p>
+              </div>
+            ) : (
+              <EventList
+                events={events}
+                onSelect={(ev) => {
+                  setSelectedEvent(ev);
+                  setOpenMobileSidebar(false); // close drawer after selecting
+                }}
+                selected={selectedEvent}
+              />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ---------- RIGHT CHAT PANEL ---------- */}
       <div className="flex-1 relative">
         <AnimatePresence mode="wait">
           {selectedEvent ? (
