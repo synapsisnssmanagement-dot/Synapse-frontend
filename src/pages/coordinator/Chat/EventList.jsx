@@ -3,31 +3,45 @@ import { CalendarDays } from "lucide-react";
 
 const EventList = ({ events, onSelect, selected }) => {
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 bg-green-600 text-white flex items-center gap-2 border-b">
-        <CalendarDays size={18} />
-        <h2 className="font-semibold text-lg">Your Events</h2>
+    <div className="h-full flex flex-col bg-white border-r border-gray-200 shadow-md">
+      {/* Header */}
+      <div className="p-4 border-b bg-green-600 text-white flex items-center gap-2 sticky top-0 z-10">
+        <CalendarDays className="w-5 h-5 text-white" />
+        <h2 className="text-lg font-semibold tracking-wide">Your Events</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      {/* Event List */}
+      <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-green-300 scrollbar-track-transparent">
         {events.length === 0 ? (
-          <p className="text-center text-gray-500 mt-5">No events assigned.</p>
+          <div className="flex items-center justify-center h-full text-gray-500 text-sm italic">
+            No events assigned yet.
+          </div>
         ) : (
-          events.map((ev) => {
-            const active = selected?._id === ev._id;
+          events.map((event) => {
+            const isSelected = selected?._id === event._id;
+
             return (
               <div
-                key={ev._id}
-                onClick={() => onSelect(ev)}
-                className={`p-4 rounded-xl border cursor-pointer transition shadow-sm ${
-                  active
-                    ? "bg-green-100 border-green-500"
-                    : "bg-white hover:bg-gray-100"
+                key={event._id}
+                onClick={() => onSelect(event)}
+                className={`cursor-pointer p-4 mb-2 rounded-xl border transition-all shadow-sm ${
+                  isSelected
+                    ? "bg-green-100 border-green-400 ring-1 ring-green-300"
+                    : "bg-white hover:bg-gray-50 hover:border-green-200"
                 }`}
               >
-                <p className="font-medium">{ev.title}</p>
-                <p className="text-xs mt-1 text-gray-500">
-                  📅 {ev.date ? new Date(ev.date).toLocaleDateString() : "No date"}
+                <h3
+                  className={`font-semibold text-sm sm:text-base ${
+                    isSelected ? "text-green-800" : "text-gray-800"
+                  }`}
+                >
+                  {event.title}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  📅 {event.date ? new Date(event.date).toLocaleDateString() : "No date"}
+                </p>
+                <p className="text-xs text-gray-400 mt-1 truncate">
+                  {event.description || "No description available"}
                 </p>
               </div>
             );
