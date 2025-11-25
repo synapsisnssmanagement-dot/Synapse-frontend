@@ -3,7 +3,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 import EventList from "./EventList";
 import MessagePanel from "./MessagePanel";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { MessageSquare, Loader2, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const socket = io("https://synapse-backend-ijri.onrender.com", {
@@ -14,14 +14,19 @@ const ChatPage = () => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // NEW → only for mobile responsiveness
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await axios.get("https://synapse-backend-ijri.onrender.com/api/coordinator/my-events", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await axios.get(
+          "https://synapse-backend-ijri.onrender.com/api/coordinator/my-events",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         setEvents(res.data.events || []);
       } catch (err) {
         console.error("Error fetching events:", err);
@@ -32,14 +37,37 @@ const ChatPage = () => {
     fetchEvents();
   }, [token]);
 
+  // Close sidebar when event is selected (mobile only)
+  const handleSelectEvent = (ev) => {
+    setSelectedEvent(ev);
+    setSidebarOpen(false);
+  };
+
   return (
-    <div className="relative h-[85vh] w-full rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-green-50 via-white to-green-100 border border-green-200 flex backdrop-blur-sm">
-      {/* Left Sidebar - Event List */}
+    <div className="relative h-[85vh] w-full rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-green-50 via-white to-green-100 border border-green-200 flex">
+
+      {/* MOBILE MENU BUTTON */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="absolute top-3 left-3 z-30 sm:hidden bg-green-600 text-white p-2 rounded-full shadow-lg"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* SIDEBAR – DESKTOP (unchanged), MOBILE (drawer) */}
       <motion.div
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 80, damping: 15 }}
-        className="w-full sm:w-1/3 border-r border-green-200 bg-gradient-to-b from-white to-green-50/60 backdrop-blur-md"
+        initial={{ x: -300 }}
+        animate={{ x: sidebarOpen ? 0 : -300 }}
+        transition={{ duration: 0.25 }}
+        className="
+          fixed sm:static
+          top-0 left-0 z-40
+          h-full
+          w-64 sm:w-1/3
+          bg-gradient-to-b from-white to-green-50/60
+          border-r border-green-200
+          shadow-lg sm:shadow-none
+        "
       >
         {loading ? (
           <div className="flex flex-col h-full justify-center items-center text-green-600 gap-2">
@@ -49,13 +77,21 @@ const ChatPage = () => {
         ) : (
           <EventList
             events={events}
-            onSelect={setSelectedEvent}
+            onSelect={handleSelectEvent}
             selected={selectedEvent}
           />
         )}
       </motion.div>
 
-      {/* Right Panel - Chat Window */}
+      {/* MOBILE OVERLAY */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm sm:hidden z-20"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* RIGHT PANEL – Chat */}
       <div className="flex-1 relative">
         <AnimatePresence mode="wait">
           {selectedEvent ? (
