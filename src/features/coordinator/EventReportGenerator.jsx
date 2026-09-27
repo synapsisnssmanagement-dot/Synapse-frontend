@@ -11,8 +11,9 @@ import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import api, { errorMessage, getList } from "@/lib/api";
 import cx from "@/lib/cx";
-import { formatDate, participantCount } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import useResource from "@/hooks/useResource";
+import { participantCount } from "./data";
 
 export default function EventReportGenerator() {
   const events = useResource(
