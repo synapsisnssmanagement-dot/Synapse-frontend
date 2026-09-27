@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import { SOCKET_URL } from "@/utils/config";
 
 const SocketContext = createContext(null);
 export const useSocket = () => useContext(SocketContext);
@@ -11,7 +12,7 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
+    const newSocket = io(SOCKET_URL, {
       auth: { token },
       transports: ["websocket"],
     });
