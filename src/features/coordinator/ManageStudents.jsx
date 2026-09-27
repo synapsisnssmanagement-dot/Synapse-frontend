@@ -1,215 +1,138 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { Search, Users, UserCheck, UserX } from "lucide-react";
+import { useMemo, useState } from "react";
+import { GraduationCap, HeartHandshake, Search, Sparkles, Undo2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import DataTable from "@/components/ui/DataTable";
+import { Input } from "@/components/ui/Field";
+import Identity from "@/components/ui/Identity";
+import PageHeader from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage, getList } from "@/lib/api";
+import { formatNumber } from "@/lib/format";
 
-const ManageStudents = () => {
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [error, setError] = useState("");
+function SkillSearch({ onResults }) {
+  const [skill, setSkill] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const token = getToken();
-
-  // Fetch all students
-  const fetchStudents = async () => {
+  const search = async (event) => {
+    event.preventDefault();
+    const term = skill.trim();
+    if (!term) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/students`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setStudents(res.data.students || []);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load students.");
+      const res = await api.post(`/api/coordinator/getstudentbyskill/${encodeURIComponent(term)}`, {});
+      const students = res.data?.students || [];
+      onResults(term, students);
+      if (!students.length) toast.info(`No students list "${term}" among their talents.`);
+    } catch (error) {
+      onResults(term, null);
+      toast.error(errorMessage(error, "No students found with that skill."));
     } finally {
       setLoading(false);
     }
   };
-
-  // Search by skill
-  const handleSearchBySkill = async () => {
-    if (!searchTerm.trim()) {
-      fetchStudents();
-      return;
-    }
-    try {
-      setLoading(true);
-      const res = await axios.post(
-        `${API_URL}/api/coordinator/getstudentbyskill/${searchTerm}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setStudents(res.data.students || []);
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("No students found with that skill.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Convert Student → Volunteer
-  const handleStudentToVolunteer = async (studentId) => {
-    try {
-      await axios.post(
-        `${API_URL}/api/coordinator/studenttovolunteer`,
-        { studentId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      fetchStudents();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to change role");
-    }
-  };
-
-  // Convert Volunteer → Student
-  const handleVolunteerToStudent = async (studentId) => {
-    try {
-      await axios.post(
-        `${API_URL}/api/coordinator/volunteertostudent`,
-        { studentId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      fetchStudents();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to change role");
-    }
-  };
-
-  useEffect(() => {
-    fetchStudents();
-  }, []);
 
   return (
-    <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Users className="text-green-700 w-7 h-7" />
-        <h2 className="text-2xl sm:text-3xl font-bold text-green-800">
-          Manage Students
-        </h2>
-      </div>
-
-      {/* Search Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center border border-gray-300 bg-white shadow-sm rounded-lg overflow-hidden w-full sm:w-1/2 lg:w-1/3">
-          <input
-            type="text"
-            placeholder="Search by skill..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-grow px-3 py-2 outline-none text-gray-700 text-sm sm:text-base"
-          />
-          <button
-            onClick={handleSearchBySkill}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base flex items-center gap-2"
-          >
-            <Search size={18} /> Search
-          </button>
-        </div>
-      </div>
-
-      {/* Table Container */}
-      <div className="bg-white rounded-2xl shadow-lg overflow-x-auto">
-        {loading ? (
-          <p className="text-center p-6 text-gray-500 animate-pulse">
-            Loading students...
-          </p>
-        ) : error ? (
-          <p className="text-center text-red-500 p-6">{error}</p>
-        ) : students.length > 0 ? (
-          <table className="min-w-full text-sm text-gray-700">
-            <thead className="bg-green-100 text-green-900 uppercase text-xs sm:text-sm">
-              <tr>
-                <th className="p-3 text-left">Name</th>
-                <th className="p-3 text-left">Email</th>
-                <th className="p-3 text-left">Department</th>
-                <th className="p-3 text-left">Skills</th>
-                <th className="p-3 text-left">Role</th>
-                <th className="p-3 text-left">Status</th>
-                <th className="p-3 text-center">Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {students.map((student) => (
-                <tr
-                  key={student._id}
-                  className="border-t hover:bg-gray-50 transition"
-                >
-                  <td className="p-3 font-medium">{student.name}</td>
-                  <td className="p-3 break-all">{student.email}</td>
-                  <td className="p-3">{student.department}</td>
-                  <td className="p-3 text-gray-600">
-                    {student.talents?.length
-                      ? student.talents.join(", ")
-                      : "N/A"}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        student.role === "volunteer"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-200 text-gray-800"
-                      }`}
-                    >
-                      {student.role}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        student.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {student.status}
-                    </span>
-                  </td>
-
-                  {/* Action Buttons */}
-                  <td className="p-3 text-center">
-                    {student.role === "student" ? (
-                      <button
-                        onClick={() =>
-                          handleStudentToVolunteer(student._id)
-                        }
-                        className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-xs sm:text-sm px-3 py-1.5 rounded-md transition"
-                      >
-                        <UserCheck size={16} /> Make Volunteer
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() =>
-                          handleVolunteerToStudent(student._id)
-                        }
-                        className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white text-xs sm:text-sm px-3 py-1.5 rounded-md transition"
-                      >
-                        <UserX size={16} /> Make Student
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="text-center text-gray-500 p-6">
-            No students found.
-          </p>
-        )}
-      </div>
-    </div>
+    <form onSubmit={search} className="flex items-end gap-2">
+      <Input label="Find by talent" leading={Search} placeholder="e.g. photography, first aid" value={skill} onChange={(e) => setSkill(e.target.value)} containerClassName="w-64" />
+      <Button type="submit" variant="outline" loading={loading}>
+        Search
+      </Button>
+    </form>
   );
-};
+}
 
-export default ManageStudents;
+export default function ManageStudents() {
+  const list = useResource(() => getList("/api/coordinator/students", "students"), []);
+  const [skillFilter, setSkillFilter] = useState(null);
+  const [busy, setBusy] = useState(null);
+
+  const rows = useMemo(() => {
+    if (!skillFilter) return list.data || [];
+    return skillFilter.students || [];
+  }, [list.data, skillFilter]);
+
+  const convert = async (student, toVolunteer) => {
+    const endpoint = toVolunteer ? "/api/coordinator/studenttovolunteer" : "/api/coordinator/volunteertostudent";
+    setBusy(student._id);
+    try {
+      await api.post(endpoint, { studentId: student._id });
+      const nextRole = toVolunteer ? "volunteer" : "student";
+      const patch = (rows2) => (rows2 || []).map((s) => (s._id === student._id ? { ...s, role: nextRole } : s));
+      list.mutate(patch);
+      if (skillFilter) setSkillFilter((prev) => ({ ...prev, students: patch(prev.students) }));
+      toast.success(toVolunteer ? `${student.name} is now an NSS volunteer.` : `${student.name} is now a regular student.`);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't update that student."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const columns = [
+    { key: "name", header: "Name", sortable: true, primary: true, render: (row) => <Identity name={row.name} email={row.email} /> },
+    { key: "department", header: "Department", sortable: true, render: (row) => row.department || "—" },
+    { key: "talents", header: "Talents", render: (row) => (Array.isArray(row.talents) ? row.talents.join(", ") : row.talents) || "—" },
+    {
+      key: "role",
+      header: "Role",
+      sortable: true,
+      render: (row) => (row.role === "volunteer" ? <StatusBadge status="active" label="Volunteer" /> : <StatusBadge status="pending" label="Student" />),
+    },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="People"
+        title="Students"
+        description="Every student at your institution. Make someone an NSS volunteer to include them in events, hours and levels."
+        meta={list.data ? <span>{formatNumber(list.data.length)} students</span> : null}
+        actions={<SkillSearch onResults={(term, students) => setSkillFilter(students ? { term, students } : { term, students: [] })} />}
+      />
+
+      {skillFilter ? (
+        <p className="mb-4 flex items-center gap-2 text-[13.5px] text-fg-2">
+          <Sparkles aria-hidden="true" className="size-4 text-brand-700" />
+          Showing {formatNumber(rows.length)} {rows.length === 1 ? "result" : "results"} for &ldquo;{skillFilter.term}&rdquo;
+          <button type="button" onClick={() => setSkillFilter(null)} className="link-draw font-semibold text-ink">
+            Clear
+          </button>
+        </p>
+      ) : null}
+
+      <DataTable
+        caption="Students"
+        columns={columns}
+        rows={rows}
+        loading={list.loading && !skillFilter}
+        error={list.status === "error" ? list.error : null}
+        onRetry={list.reload}
+        searchKeys={skillFilter ? undefined : ["name", "email", "department"]}
+        searchPlaceholder="Search students"
+        initialSort={{ key: "name", dir: "asc" }}
+        noun="students"
+        rowActions={(row) => (
+          <Button
+            size="sm"
+            variant="outline"
+            icon={row.role === "volunteer" ? Undo2 : HeartHandshake}
+            loading={busy === row._id}
+            onClick={() => convert(row, row.role !== "volunteer")}
+          >
+            {row.role === "volunteer" ? "Make student" : "Make volunteer"}
+          </Button>
+        )}
+        empty={{
+          icon: GraduationCap,
+          title: skillFilter ? "No students match that talent" : "No students yet",
+          description: skillFilter ? "Try a broader term, or clear the search." : "Students appear here once an administrator approves their accounts.",
+        }}
+      />
+    </>
+  );
+}

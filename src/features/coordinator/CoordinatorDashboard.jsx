@@ -1,374 +1,360 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
-import {
-  FaCalendarAlt,
-  FaUsers,
-  FaCheckCircle,
-  FaClock,
-  FaUserTie,
-  FaRobot,
-} from "react-icons/fa";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Legend,
-  LineChart,
-  Line,
-} from "recharts";
-import { motion } from "framer-motion";
+import Link from "next/link";
+import { useState } from "react";
+import { AlertTriangle, ArrowUpRight, CalendarPlus, CalendarRange, CheckCircle2, Clock3, Info, MapPin, Presentation, Sparkles, Users } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CHART_COLORS, ChartLegend, ChartTooltip, axisProps, gridProps } from "@/components/charts/chartTheme";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import DateBlock from "@/components/ui/DateBlock";
+import PageHeader, { Accent } from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { DashboardSkeleton } from "@/components/ui/Skeleton";
+import StatCard from "@/components/ui/StatCard";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import cx from "@/lib/cx";
+import { firstName, formatDate, formatNumber, greeting } from "@/lib/format";
+import { attentionItems, deliveredHours, participantCount, presentCount, sortEvents, teacherCount, useCoordinatorProfile, useMyEvents } from "./data";
+import useEventLifecycle from "./lifecycle";
 
-const COLORS = ["#34d399", "#facc15", "#f87171", "#60a5fa"];
+const INSIGHT_KEY = "synapsis.coordinator.insight";
 
-const CoordinatorDashboard = () => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [insight, setInsight] = useState("");
+function NowAndNext({ events, lifecycle }) {
+  const live = events.filter((e) => e.status === "Ongoing");
+  const next = sortEvents(events.filter((e) => e.status === "Upcoming")).slice(0, 4);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
-
-  // ---------- FETCH DASHBOARD DATA ----------
-  const fetchDashboard = async () => {
-    try {
-      const token = getToken();
-      if (!token) {
-        toast.error("Session expired. Please login again.");
-        return;
+  return (
+    <Panel
+      title="Now and next"
+      description="Your live and upcoming drives"
+      actions={
+        <Link href="/coordinatorlayout/myevents" className="link-draw text-[13px] font-semibold text-fg-2 hover:text-ink">
+          All events
+        </Link>
       }
+      bodyClassName="p-0"
+    >
+      {!live.length && !next.length ? (
+        <EmptyState
+          size="sm"
+          icon={CalendarRange}
+          title="Nothing scheduled"
+          description="Plan the next drive and it will appear here with its team and status."
+          action={
+            <Button href="/coordinatorlayout/createevent" size="sm" icon={CalendarPlus}>
+              Create event
+            </Button>
+          }
+        />
+      ) : (
+        <ul className="divide-y divide-line">
+          {live.map((event) => (
+            <li key={event._id} className="flex flex-col gap-4 bg-mint/60 px-5 py-4 sm:flex-row sm:items-center">
+              <DateBlock date={event.date} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status="ongoing" label="Live now" />
+                  <p className="truncate text-[15px] font-semibold text-fg">{event.title}</p>
+                </div>
+                <p className="mt-1 text-[13px] text-muted">
+                  {presentCount(event)} of {participantCount(event)} volunteers marked present
+                </p>
+              </div>
+              <Button size="sm" variant="dark" onClick={() => lifecycle.complete(event)}>
+                Complete event
+              </Button>
+            </li>
+          ))}
+          {next.map((event) => (
+            <li key={event._id} className="flex items-center gap-4 px-5 py-4">
+              <DateBlock date={event.date} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold text-fg">{event.title}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
+                  {event.location ? (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin aria-hidden="true" className="size-3.5" />
+                      {event.location}
+                    </span>
+                  ) : null}
+                  <span className="flex items-center gap-1.5">
+                    <Users aria-hidden="true" className="size-3.5" />
+                    {participantCount(event)} volunteers
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Presentation aria-hidden="true" className="size-3.5" />
+                    {teacherCount(event)} {teacherCount(event) === 1 ? "teacher" : "teachers"}
+                  </span>
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => lifecycle.start(event)} className="hidden sm:inline-flex">
+                Start
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
 
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/coordinatordashboard`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+const TONE = {
+  danger: { icon: AlertTriangle, cls: "border-red-200 bg-red-50 text-red-600" },
+  warning: { icon: Clock3, cls: "border-amber-200 bg-amber-50 text-amber-700" },
+  info: { icon: Info, cls: "border-blue-200 bg-blue-50 text-blue-600" },
+};
 
-      setData(res.data.data);
-      generateAutoInsight(res.data.data);
-    } catch (error) {
-      console.error("Dashboard Error:", error);
-      toast.error("Failed to load dashboard data");
+function hrefFor(text) {
+  if (text.includes("teacher")) return "/coordinatorlayout/manageteacher";
+  if (text.includes("volunteers assigned")) return "/coordinatorlayout/managevolunteer";
+  return "/coordinatorlayout/myevents";
+}
+
+function Attention({ events }) {
+  const items = attentionItems(events).slice(0, 5);
+  return (
+    <Panel title="Needs attention" description="Things that could stop a drive going well" bodyClassName="p-0">
+      {items.length ? (
+        <ul className="divide-y divide-line">
+          {items.map(({ event, tone, text }, i) => {
+            const { icon: Icon, cls } = TONE[tone];
+            return (
+              <li key={`${event._id}-${i}`}>
+                <Link href={hrefFor(text)} className="group flex gap-3 px-5 py-4 transition-colors hover:bg-canvas">
+                  <span className={cx("flex size-8 shrink-0 items-center justify-center rounded-lg border", cls)}>
+                    <Icon aria-hidden="true" className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-fg">{event.title}</span>
+                    <span className="block text-[13px] leading-snug text-muted">{text}</span>
+                  </span>
+                  <ArrowUpRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-subtle transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand-700" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <EmptyState size="sm" icon={CheckCircle2} title="Everything is on track" description="Every active event has a teacher and volunteers, and nothing is overdue." />
+      )}
+    </Panel>
+  );
+}
+
+function MonthlyChart({ events }) {
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (5 - i));
+    return { key: `${d.getFullYear()}-${d.getMonth()}`, label: new Intl.DateTimeFormat("en-IN", { month: "short" }).format(d), completed: 0, planned: 0 };
+  });
+  events.forEach((event) => {
+    const d = event.date ? new Date(event.date) : null;
+    if (!d) return;
+    const bucket = months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);
+    if (!bucket) return;
+    if (event.status === "Completed") bucket.completed += 1;
+    else bucket.planned += 1;
+  });
+  const any = months.some((m) => m.completed || m.planned);
+
+  return (
+    <Panel
+      title="Your drives by month"
+      description="Last six months"
+      actions={
+        <ChartLegend
+          items={[
+            { label: "Completed", color: CHART_COLORS.brand },
+            { label: "Planned or live", color: CHART_COLORS.ink },
+          ]}
+        />
+      }
+    >
+      {any ? (
+        <div className="h-56" role="img" aria-label={months.map((m) => `${m.label}: ${m.completed} completed, ${m.planned} planned`).join("; ")}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={months} margin={{ top: 8, right: 4, left: -28, bottom: 0 }} barGap={4}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="label" {...axisProps} />
+              <YAxis {...axisProps} allowDecimals={false} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f1f5f9" }} />
+              <Bar dataKey="completed" name="Completed" stackId="a" fill={CHART_COLORS.brand} radius={[0, 0, 0, 0]} maxBarSize={36} />
+              <Bar dataKey="planned" name="Planned or live" stackId="a" fill={CHART_COLORS.ink} radius={[3, 3, 0, 0]} maxBarSize={36} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <EmptyState size="sm" icon={CalendarRange} title="No drives in the last six months" description="Your monthly activity will chart here." />
+      )}
+    </Panel>
+  );
+}
+
+function readCachedInsight() {
+  try {
+    return window.sessionStorage.getItem(INSIGHT_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function InsightPanel({ summary }) {
+  const [insight, setInsight] = useState(readCachedInsight);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const generate = async () => {
+    setLoading(true);
+    setError("");
+    const prompt = `You are helping an NSS (National Service Scheme) unit coordinator in India.
+Unit data:
+- Students: ${summary.totalStudents}, of whom volunteers: ${summary.totalVolunteers}
+- Teachers: ${summary.totalTeachers}
+- Grace mark recommendations made: ${summary.totalGraceRecommendations}
+- Institution events: ${summary.allEvents?.totalEvents ?? 0} (${summary.allEvents?.completedEvents ?? 0} completed, ${summary.allEvents?.upcomingEvents ?? 0} upcoming)
+- Events this coordinator manages: ${summary.myEvents?.totalEvents ?? 0}
+- Volunteer hours delivered in this coordinator's completed events: ${summary.hours}
+Write 3 or 4 short, specific observations with one practical suggestion each. Plain sentences, one per line, no headings, no emoji.`;
+    try {
+      const res = await api.post("/api/ai/generate", { prompt });
+      const text = String(res.data?.insight || "").trim();
+      setInsight(text);
+      try {
+        window.sessionStorage.setItem(INSIGHT_KEY, text);
+      } catch {
+        // Cache is a convenience only.
+      }
+    } catch (err) {
+      setError(errorMessage(err, "The insight service is unavailable right now."));
     } finally {
       setLoading(false);
     }
   };
 
-  // ---------- AUTO AI INSIGHT GENERATION ----------
-  const generateAutoInsight = async (dashboardData) => {
-    try {
-      setAiLoading(true);
-      const prompt = `
-        Based on this NSS Coordinator data:
-        - Total Students: ${dashboardData.totalStudents}
-        - Total Volunteers: ${dashboardData.totalVolunteers}
-        - Total Teachers: ${dashboardData.totalTeachers}
-        - Grace Marks Recommended: ${dashboardData.totalGraceRecommendations}
-        - Total Events: ${dashboardData.allEvents.totalEvents}
-        - Completed Events: ${dashboardData.allEvents.completedEvents}
-        - Upcoming Events: ${dashboardData.allEvents.upcomingEvents}
-        - My Managed Events: ${dashboardData.myEvents.totalEvents}
-
-        Provide 3-4 short insights about performance, engagement, and suggestions.
-      `;
-
-      const res = await axios.post(
-        `${API_URL}/api/ai/generate`,
-        { prompt },
-        { headers: { Authorization: `Bearer ${getToken()}` } }
-      );
-
-      setInsight(res.data.insight);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to auto-generate insights");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  if (loading)
-    return (
-      <div className="text-center mt-20 text-gray-600 text-lg font-medium">
-        Loading Coordinator Dashboard...
-      </div>
-    );
-
-  if (!data)
-    return (
-      <div className="text-center mt-20 text-red-500 text-lg font-medium">
-        No dashboard data available.
-      </div>
-    );
-
-  const {
-    allEvents = {},
-    myEvents = {},
-    totalStudents = 0,
-    totalVolunteers = 0,
-    totalTeachers = 0,
-    totalGraceRecommendations = 0,
-  } = data;
-
-  const eventData = [
-    { name: "Completed", value: allEvents.completedEvents || 0 },
-    { name: "Upcoming", value: allEvents.upcomingEvents || 0 },
-    { name: "Total", value: allEvents.totalEvents || 0 },
-  ];
-
-  const barData = [
-    {
-      name: "Events",
-      All: allEvents.totalEvents || 0,
-      MyEvents: myEvents.totalEvents || 0,
-    },
-    {
-      name: "Completed",
-      All: allEvents.completedEvents || 0,
-      MyEvents: myEvents.completedEvents || 0,
-    },
-    {
-      name: "Upcoming",
-      All: allEvents.upcomingEvents || 0,
-      MyEvents: myEvents.upcomingEvents || 0,
-    },
-  ];
-
-  const lineData = [
-    { name: "Students", value: totalStudents },
-    { name: "Volunteers", value: totalVolunteers },
-    { name: "Teachers", value: totalTeachers },
-  ];
+  const lines = insight
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+    .filter(Boolean);
 
   return (
-    <div className="p-6 space-y-10 bg-gradient-to-br from-green-50 to-green-100 min-h-screen">
-      <h1 className="text-4xl font-bold text-green-800 mb-8 text-center">
-        NSS Coordinator Dashboard
-      </h1>
-
-      {/* ---------- AI INSIGHT SECTION ---------- */}
-      <motion.section
-        className="bg-white shadow-xl rounded-2xl p-8 space-y-6 border border-green-100"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="flex items-center gap-3">
-          <FaRobot className="text-green-600 text-3xl" />
-          <h2 className="text-2xl font-semibold text-green-700">
-            AI Insights
-          </h2>
+    <section aria-labelledby="insight-title" className="flex flex-col rounded-2xl bg-ink p-6 text-on-dark">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p id="insight-title" className="eyebrow flex items-center gap-2 text-brand">
+            <Sparkles aria-hidden="true" className="size-3.5" /> Unit insight
+          </p>
+          <p className="mt-2 text-[13px] text-on-dark/55">Written by AI from your unit&apos;s numbers.</p>
         </div>
-
-        {aiLoading ? (
-          <p className="text-gray-500 italic">Generating insights...</p>
-        ) : insight ? (
-          <motion.div
-            className="p-4 bg-green-50 border border-green-200 rounded-xl shadow-inner text-gray-800 whitespace-pre-wrap"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            {insight}
-          </motion.div>
+        <Button size="sm" variant={insight ? "outline-dark" : "light"} loading={loading} onClick={generate}>
+          {insight ? "Refresh" : "Generate"}
+        </Button>
+      </div>
+      <div aria-live="polite" className="mt-6 flex-1">
+        {error ? (
+          <p className="text-[14px] text-red-300">{error}</p>
+        ) : lines.length ? (
+          <ul className="space-y-4">
+            {lines.map((line, i) => (
+              <li key={i} className="flex gap-3 text-[14.5px] leading-relaxed text-on-dark/85">
+                <span aria-hidden="true" className="tabular mt-0.5 text-[12px] font-semibold text-brand">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                {line}
+              </li>
+            ))}
+          </ul>
         ) : (
-          <p className="text-gray-500 italic">
-            AI insights will appear here based on your dashboard statistics.
+          <p className="text-[14.5px] leading-relaxed text-on-dark/60">
+            Get a short read on participation, momentum and where to focus next. Generated on request so it only runs when you
+            need it.
           </p>
         )}
-      </motion.section>
+      </div>
+    </section>
+  );
+}
 
-      {/* ---------- OVERVIEW STATS ---------- */}
-      <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6 }}
-      >
-        <StatCard title="Total Students" value={totalStudents} icon={<FaUsers />} />
-        <StatCard title="Total Volunteers" value={totalVolunteers} icon={<FaUsers />} />
-        <StatCard title="Total Teachers" value={totalTeachers} icon={<FaUserTie />} />
-        <StatCard
-          title="Grace Marks Recommended"
-          value={totalGraceRecommendations}
-          icon={<FaCheckCircle />}
-        />
-      </motion.div>
+export default function CoordinatorDashboard() {
+  const dashboard = useResource(() => api.get("/api/coordinator/coordinatordashboard").then((res) => res.data?.data || {}), []);
+  const events = useMyEvents();
+  const profile = useCoordinatorProfile();
+  const lifecycle = useEventLifecycle((updated) =>
+    events.mutate((list) => (list || []).map((e) => (e._id === updated._id ? { ...e, ...updated } : e)))
+  );
 
-      {/* ---------- CHARTS SECTION ---------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Pie Chart */}
-        <ChartCard title="Event Distribution">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={eventData}
-                dataKey="value"
-                nameKey="name"
-                outerRadius={110}
-                label
-              >
-                {eventData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
+  if (dashboard.loading || events.loading) return <DashboardSkeleton />;
+  if (dashboard.status === "error") {
+    return <ErrorState title="We couldn't load your dashboard" error={dashboard.error} onRetry={dashboard.reload} />;
+  }
 
-        {/* Bar Chart */}
-        <ChartCard title="My vs All Events">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={barData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="All" fill="#34d399" />
-              <Bar dataKey="MyEvents" fill="#60a5fa" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+  const d = dashboard.data || {};
+  const myEvents = events.data || [];
+  const hours = Math.round(myEvents.reduce((sum, e) => sum + deliveredHours(e), 0));
+  const completed = myEvents.filter((e) => e.status === "Completed").length;
+  const name = profile.data?.name;
 
-        {/* Line Chart */}
-        <ChartCard title="Community Growth">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={lineData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="#16a34a" strokeWidth={3} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+  return (
+    <>
+      <PageHeader
+        eyebrow={profile.data?.institutionName || "Coordinator"}
+        title={
+          <>
+            {greeting()}
+            {name ? (
+              <>
+                , <Accent>{firstName(name)}</Accent>
+              </>
+            ) : null}
+          </>
+        }
+        description="What is happening in your unit, what needs you, and the difference it is making."
+        actions={
+          <Button href="/coordinatorlayout/createevent" icon={CalendarPlus}>
+            Create event
+          </Button>
+        }
+      />
+
+      {events.status === "error" ? (
+        <div className="mb-4">
+          <ErrorState size="sm" title="We couldn't load your events" error={events.error} onRetry={events.reload} />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-7">
+          <NowAndNext events={myEvents} lifecycle={lifecycle} />
+        </div>
+        <div className="xl:col-span-5">
+          <Attention events={myEvents} />
+        </div>
       </div>
 
-      {/* ---------- EVENTS SECTION ---------- */}
-      <DashboardSection
-        title="All NSS Events"
-        color="text-green-700"
-        stats={[
-          { title: "Total Events", value: allEvents.totalEvents, icon: <FaCalendarAlt /> },
-          { title: "Completed Events", value: allEvents.completedEvents, icon: <FaCheckCircle /> },
-          { title: "Upcoming Events", value: allEvents.upcomingEvents, icon: <FaClock /> },
-        ]}
-        events={allEvents.recentEvents}
-      />
-    </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          variant="feature"
+          className="col-span-2 lg:col-span-1"
+          label="Hours delivered"
+          value={hours}
+          unit="h"
+          footnote={`Across ${completed} completed ${completed === 1 ? "drive" : "drives"}`}
+        />
+        <StatCard label="Volunteers" value={d.totalVolunteers ?? 0} icon={Users} footnote={`of ${formatNumber(d.totalStudents ?? 0)} students`} align="bottom" />
+        <StatCard label="Your events" value={d.myEvents?.totalEvents ?? myEvents.length} icon={CalendarRange} footnote={`${formatNumber(d.myEvents?.upcomingEvents ?? 0)} upcoming`} align="bottom" />
+        <StatCard label="Grace marks" value={d.totalGraceRecommendations ?? 0} icon={CheckCircle2} footnote="Recommended so far" align="bottom" />
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <MonthlyChart events={myEvents} />
+        <InsightPanel summary={{ ...d, hours }} />
+      </div>
+
+      <p className="mt-6 text-[12.5px] text-subtle">Figures update when events are started, completed and attended. Last loaded {formatDate(new Date(), "time")}.</p>
+      {lifecycle.dialog}
+    </>
   );
-};
-
-/* ---------- REUSABLE COMPONENTS ---------- */
-const StatCard = ({ title, value, icon }) => (
-  <motion.div
-    whileHover={{ scale: 1.05 }}
-    className="flex items-center justify-between bg-white p-5 rounded-2xl shadow-md hover:shadow-lg transition"
-  >
-    <div>
-      <p className="text-gray-600 text-sm">{title}</p>
-      <h3 className="text-3xl font-bold text-green-700">{value || 0}</h3>
-    </div>
-    <div className="text-green-500 text-3xl">{icon}</div>
-  </motion.div>
-);
-
-const ChartCard = ({ title, children }) => (
-  <motion.div
-    className="bg-white rounded-2xl shadow-md p-6"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.5 }}
-  >
-    <h2 className="text-xl font-semibold mb-4 text-green-700">{title}</h2>
-    {children}
-  </motion.div>
-);
-
-const DashboardSection = ({ title, color, stats, events }) => (
-  <motion.section
-    className="bg-white shadow-md rounded-2xl p-6"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.5 }}
-  >
-    <h2 className={`text-2xl font-semibold mb-4 flex items-center gap-2 ${color}`}>
-      <FaCalendarAlt /> {title}
-    </h2>
-
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      {stats.map((s, i) => (
-        <StatCard key={i} {...s} />
-      ))}
-    </div>
-
-    <RecentEventsTable title="Recent Events" events={events} />
-  </motion.section>
-);
-
-const RecentEventsTable = ({ title, events }) => (
-  <div>
-    <h3 className="text-lg font-semibold mb-3 text-gray-700">{title}</h3>
-    <div className="overflow-x-auto">
-      <table className="min-w-full bg-white border border-gray-200 rounded-xl">
-        <thead>
-          <tr className="bg-gray-100 text-gray-700">
-            <th className="px-4 py-2 text-left">Title</th>
-            <th className="px-4 py-2 text-left">Date</th>
-            <th className="px-4 py-2 text-left">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {!events || events.length === 0 ? (
-            <tr>
-              <td colSpan="3" className="text-center py-4 text-gray-500">
-                No events found
-              </td>
-            </tr>
-          ) : (
-            events.map((event) => (
-              <tr key={event._id} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-2">{event.title}</td>
-                <td className="px-4 py-2">
-                  {new Date(event.date).toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </td>
-                <td
-                  className={`px-4 py-2 font-semibold ${
-                    event.status === "Completed"
-                      ? "text-green-600"
-                      : event.status === "Upcoming"
-                      ? "text-yellow-600"
-                      : "text-gray-600"
-                  }`}
-                >
-                  {event.status}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-export default CoordinatorDashboard;
+}

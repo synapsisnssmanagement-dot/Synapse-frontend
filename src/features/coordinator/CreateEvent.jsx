@@ -1,394 +1,317 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-// import React from "react";
-// import { useEffect } from "react";
-// import { useState } from "react";
-// import { toast } from "react-toastify";
-// import axios from "axios";
-// import CircularProgress from "@mui/material/CircularProgress";
-
-// const CreateEvent = () => {
-//   const [formData, setFormData] = useState({
-//     title: "",
-//     description: "",
-//     date: "",
-//     location: "",
-//     hours: "",
-//     institutionId: "",
-//     caption: "",
-//   });
-//   const [image, setImage] = useState(null);
-//   const [institutions, setInstitutions] = useState([]);
-//   const [loading, setLoading] = useState(true);
-//   const token = getToken();
-
-//   useEffect(() => {
-//     const fetchInstitutions = async (req, res) => {
-//       try {
-//         setLoading(true);
-//         const res = await axios.get(
-//           "http://localhost:3000/api/institution/getallinstitutes"
-//         );
-//         setInstitutions(res.data.institutions);
-//       } catch (error) {
-//         toast.error(error.message);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//     fetchInstitutions();
-//   }, []);
-
-//   if (loading) {
-//     return (
-//       <CircularProgress color="success">Dashboard loading</CircularProgress>
-//     );
-//   }
-
-//   const handleFileChange = (e) => {
-//     setImage(e.target.files[0]);
-//   };
-
-//   const handleChange = (e) => {
-//     setFormData({ ...formData, [e.target.name]: e.target.value });
-//   };
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     try {
-//       const res = await axios.post(
-//         "http://localhost:3000/api/coordinator/createevents",
-//         formData,
-//         {
-//           headers: { Authorization: `Bearer ${token}` },
-//         }
-//       );
-//       toast.success("created event successfully");
-//     } catch (error) {
-//       toast.error("failed to send data:", error.message);
-//     }
-//   };
-
-//   return (
-//     <div className="flex flex-col gap-5">
-//       <input
-//         type="text"
-//         name="title"
-//         placeholder="title"
-//         className="border-1 p-2"
-//         value={formData.title}
-//         onChange={handleChange}
-//       />
-//       <input
-//         type="text"
-//         name="description"
-//         placeholder="description"
-//         className="border-1 p-2"
-//         value={formData.description}
-//         onChange={handleChange}
-//       />
-//       <input
-//         type="text"
-//         name="location"
-//         placeholder="Location"
-//         className="border-1 p-2"
-//         value={formData.location}
-//         onChange={handleChange}
-//       />
-//       <input
-//         type="date"
-//         name="date"
-//         placeholder="date"
-//         className="border-1 p-2"
-//         value={formData.date}
-//         onChange={handleChange}
-//       />
-//       <input
-//         type="number"
-//         name="hours"
-//         placeholder="hours"
-//         className="border-1 p-2"
-//         value={formData.hours}
-//         onChange={handleChange}
-//       />
-//       <input
-//         type="file"
-//         name="image"
-//         placeholder="hours"
-//         className="border-1 p-2"
-//         onChange={handleFileChange}
-//       />
-//       <select
-//         name="institutionId"
-//         value={formData.institutionId}
-//         onChange={handleChange}
-//         className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none"
-//         required
-//       >
-//         <option value="">Select Institution</option>
-//         {institutions.map((inst) => (
-//           <option key={inst._id} value={inst._id}>
-//             {inst.name}
-//           </option>
-//         ))}
-//       </select>
-//       <button
-//         type="submit"
-//         onClick={() => handleSubmit()}
-//         className="bg-green-500 p-2 hover:bg-green-600 transition-all duration-300"
-//       >
-//         Submit
-//       </button>
-//     </div>
-//   );
-// };
-
-// export default CreateEvent;
-
-import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowLeft, Bell, CalendarDays, CalendarPlus, CheckCircle2, Clock3, MapPin, Presentation, Users } from "lucide-react";
 import { toast } from "react-toastify";
-import axios from "axios";
-import CircularProgress from "@mui/material/CircularProgress";
-import { motion } from "framer-motion";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import UploadZone from "@/components/ui/UploadZone";
+import api, { errorMessage } from "@/lib/api";
+import cx from "@/lib/cx";
+import { formatDate } from "@/lib/format";
 
-const CreateEvent = () => {
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    date: "",
-    location: "",
-    hours: "",
-    caption: "",
-  });
+const STEPS = ["Details", "Date and place", "Cover photo", "Review"];
+const EMPTY = { title: "", description: "", date: "", hours: "", location: "", caption: "" };
 
-  const [image, setImage] = useState(null);
-  const [institutionId, setInstitutionId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+function todayInputValue() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
 
-  const token = getToken();
+function validate(step, values) {
+  const errors = {};
+  if (step === 0) {
+    if (values.title.trim().length < 4) errors.title = "Give the event a clear name (at least 4 characters).";
+    if (values.description.trim().length < 20) errors.description = "Describe the drive in a sentence or two (at least 20 characters).";
+  }
+  if (step === 1) {
+    if (!values.date) errors.date = "Choose a date.";
+    const hours = Number(values.hours);
+    if (!values.hours || !Number.isFinite(hours) || hours <= 0 || hours > 24) errors.hours = "Enter the planned hours, between 1 and 24.";
+    if (!values.location.trim()) errors.location = "Where is it happening?";
+  }
+  return errors;
+}
 
+function Preview({ values, image }) {
+  const [url, setUrl] = useState(null);
   useEffect(() => {
-    const fetchCoordinator = async () => {
-      try {
-        const res = await axios.get(
-          `${API_URL}/api/coordinator/profile`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        setInstitutionId(res.data.data.institution);
-      } catch (error) {
-        toast.error("Failed to fetch coordinator details");
-      } finally {
-        setLoading(false);
-      }
+    if (!image) return undefined;
+    const next = URL.createObjectURL(image);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URL lifecycle follows the chosen file
+    setUrl(next);
+    return () => {
+      URL.revokeObjectURL(next);
+      setUrl(null);
     };
+  }, [image]);
 
-    fetchCoordinator();
-  }, [token]);
+  return (
+    <article className="overflow-hidden rounded-xl border border-line bg-paper">
+      <div className="relative aspect-[16/7] bg-ink">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- local preview of the chosen file
+          <img src={url} alt="" className="size-full object-cover" />
+        ) : (
+          <div className="flex size-full items-end p-6">
+            <p className="tabular font-display text-6xl leading-none text-brand">{values.date ? new Date(values.date).getDate() : "--"}</p>
+            <p className="mb-1 ml-3 text-sm font-semibold uppercase tracking-[0.12em] text-white">
+              {values.date ? new Intl.DateTimeFormat("en-IN", { month: "long" }).format(new Date(values.date)) : ""}
+            </p>
+          </div>
+        )}
+        {values.caption && url ? <p className="absolute bottom-3 left-4 rounded-sm bg-ink/70 px-2 py-1 text-[12px] text-white">{values.caption}</p> : null}
+      </div>
+      <div className="p-6">
+        <StatusBadge status="upcoming" />
+        <h3 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-ink">{values.title || "Untitled event"}</h3>
+        <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-fg-2">{values.description}</p>
+        <ul className="mt-5 grid gap-2.5 text-[14px] text-fg-2 sm:grid-cols-3">
+          <li className="flex items-center gap-2">
+            <CalendarDays aria-hidden="true" className="size-4 text-subtle" /> {formatDate(values.date, "long")}
+          </li>
+          <li className="flex items-center gap-2">
+            <Clock3 aria-hidden="true" className="size-4 text-subtle" /> {values.hours || "—"} hours
+          </li>
+          <li className="flex items-center gap-2">
+            <MapPin aria-hidden="true" className="size-4 text-subtle" /> {values.location || "—"}
+          </li>
+        </ul>
+      </div>
+    </article>
+  );
+}
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+function Created({ event, onAnother }) {
+  return (
+    <div className="mx-auto max-w-2xl py-6 text-center">
+      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-brand/25 bg-mint text-brand-700">
+        <CheckCircle2 aria-hidden="true" className="size-6" />
+      </span>
+      <h2 className="mt-6 text-3xl font-semibold tracking-[-0.035em] text-ink">{event.title} is on the calendar</h2>
+      <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">
+        Teachers and volunteers at your institution have been notified. Next, give the drive a team.
+      </p>
+      <div className="mt-10 grid gap-3 text-left sm:grid-cols-2">
+        {[
+          { href: "/coordinatorlayout/manageteacher", icon: Presentation, title: "Assign teachers", text: "They take attendance on the day." },
+          { href: "/coordinatorlayout/managevolunteer", icon: Users, title: "Choose volunteers", text: "Pick who serves at this drive." },
+        ].map(({ href, icon: Icon, title, text }) => (
+          <Link key={href} href={href} className="group rounded-xl border border-line bg-paper p-5 transition-colors hover:border-ink">
+            <Icon aria-hidden="true" className="size-5 text-brand-700" />
+            <p className="mt-4 font-semibold text-fg">{title}</p>
+            <p className="mt-1 text-[13.5px] text-muted">{text}</p>
+          </Link>
+        ))}
+      </div>
+      <div className="mt-8 flex justify-center gap-3">
+        <Button href="/coordinatorlayout/myevents" variant="outline">
+          View my events
+        </Button>
+        <Button variant="ghost" icon={CalendarPlus} onClick={onAnother}>
+          Create another
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function CreateEvent() {
+  const reduce = useReducedMotion();
+  const [step, setStep] = useState(0);
+  const [values, setValues] = useState(EMPTY);
+  const [image, setImage] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [created, setCreated] = useState(null);
+
+  const update = (event) => {
+    const { name, value } = event.target;
+    setValues((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  const handleFileChange = (e) => {
-    setImage(e.target.files[0]);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!institutionId) {
-      return toast.error("Institution not found. Please re-login.");
-    }
-
+  const publish = async () => {
+    setSubmitting(true);
+    const form = new FormData();
+    form.append("title", values.title.trim());
+    form.append("description", values.description.trim());
+    form.append("date", values.date);
+    form.append("hours", values.hours);
+    form.append("location", values.location.trim());
+    form.append("caption", values.caption.trim());
+    if (image) form.append("images", image);
     try {
-      setSubmitting(true);
-
-      const form = new FormData();
-      Object.entries(formData).forEach(([key, value]) =>
-        form.append(key, value)
-      );
-      form.append("institutionId", institutionId);
-      if (image) form.append("images", image);
-
-      const res = await axios.post(
-        `${API_URL}/api/coordinator/createevents`,
-        form,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      toast.success(res.data.message || "Event created successfully!");
-
-      setFormData({
-        title: "",
-        description: "",
-        date: "",
-        location: "",
-        hours: "",
-        caption: "",
-      });
-      setImage(null);
+      const res = await api.post("/api/coordinator/createevents", form);
+      setCreated(res.data?.event || { title: values.title.trim() });
+      toast.success("Event created.");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create event");
+      toast.error(errorMessage(error, "We couldn't create the event."));
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <CircularProgress color="success" />
-      </div>
-    );
-  }
+  const onSubmit = (event) => {
+    event.preventDefault();
+    const next = validate(step, values);
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    if (step < STEPS.length - 1) setStep(step + 1);
+    else publish();
+  };
+
+  const reset = () => {
+    setValues(EMPTY);
+    setImage(null);
+    setErrors({});
+    setStep(0);
+    setCreated(null);
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-green-50 to-green-100">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 40 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="
-          w-full 
-          max-w-md 
-          sm:max-w-lg 
-          lg:max-w-xl 
-          bg-white/80 
-          backdrop-blur-xl 
-          shadow-xl 
-          border border-white/30
-          rounded-3xl 
-          p-6 
-          sm:p-10
-        "
-      >
-        <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-center text-emerald-700">
-          🌿 Create New NSS Event
-        </h2>
+    <>
+      <PageHeader eyebrow="Events" title="Create an event" description="Plan a drive in four short steps. You can assign teachers and volunteers once it exists." />
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-6">
-          {[
-            { name: "title", type: "text", placeholder: "Event Title" },
-            { name: "location", type: "text", placeholder: "Event Location" },
-            { name: "date", type: "date", placeholder: "Event Date" },
-            { name: "hours", type: "number", placeholder: "Duration (hours)" },
-            { name: "caption", type: "text", placeholder: "Image Caption (optional)" },
-          ].map((input) => (
-            <motion.input
-              key={input.name}
-              type={input.type}
-              name={input.name}
-              placeholder={input.placeholder}
-              value={formData[input.name]}
-              onChange={handleChange}
-              whileFocus={{ scale: 1.02 }}
-              className="
-                w-full 
-                border border-emerald-300 
-                bg-white/70 
-                p-3 
-                rounded-xl 
-                text-sm sm:text-base
-                focus:ring-2 
-                focus:ring-emerald-400 
-                outline-none
-              "
-              required={input.name !== "caption"}
-            />
-          ))}
+      {created ? (
+        <Created event={created} onAnother={reset} />
+      ) : (
+        <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] xl:gap-12">
+          <ol aria-label="Steps" className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-0">
+            {STEPS.map((label, index) => (
+              <li key={label} aria-current={index === step ? "step" : undefined} className="relative shrink-0 lg:pb-8 lg:last:pb-0">
+                {index < STEPS.length - 1 ? (
+                  <span aria-hidden="true" className={cx("absolute left-[15px] top-9 hidden h-[calc(100%-2.5rem)] w-px lg:block", index < step ? "bg-ink" : "bg-line")} />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={index > step}
+                  onClick={() => index < step && setStep(index)}
+                  className="flex items-center gap-3 rounded-lg py-1 pr-3 text-left disabled:cursor-default"
+                >
+                  <span
+                    className={cx(
+                      "tabular flex size-8 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold",
+                      index < step ? "border-ink bg-ink text-white" : index === step ? "border-brand bg-brand text-ink" : "border-line bg-paper text-subtle"
+                    )}
+                  >
+                    {index < step ? <CheckCircle2 aria-hidden="true" className="size-4" /> : index + 1}
+                  </span>
+                  <span className={cx("whitespace-nowrap text-[14px] font-semibold", index <= step ? "text-fg" : "text-subtle")}>{label}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
 
-          <motion.textarea
-            name="description"
-            placeholder="Event Description"
-            rows="4"
-            value={formData.description}
-            onChange={handleChange}
-            whileFocus={{ scale: 1.02 }}
-            className="
-              w-full 
-              border border-emerald-300 
-              bg-white/70 
-              p-3 
-              rounded-xl 
-              text-sm sm:text-base
-              focus:ring-2 
-              focus:ring-emerald-400 
-              outline-none 
-              resize-none
-            "
-            required
-          />
+          <form onSubmit={onSubmit} noValidate className="min-w-0">
+            <div className="rounded-xl border border-line bg-paper p-5 sm:p-8">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, y: reduce ? 0 : 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: reduce ? 0 : -6 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-6"
+                >
+                  {step === 0 ? (
+                    <>
+                      <Input
+                        label="Event name"
+                        name="title"
+                        placeholder="e.g. Coastal Cleanup Initiative"
+                        value={values.title}
+                        onChange={update}
+                        error={errors.title}
+                        required
+                      />
+                      <Textarea
+                        label="What is the drive about?"
+                        name="description"
+                        rows={6}
+                        placeholder="Who it helps, what volunteers will do, and anything they should bring."
+                        hint={`${values.description.trim().length} characters. Volunteers read this before they sign up.`}
+                        value={values.description}
+                        onChange={update}
+                        error={errors.description}
+                        required
+                      />
+                    </>
+                  ) : null}
 
-          <motion.div whileHover={{ scale: 1.02 }} className="w-full">
-            <label className="block text-emerald-700 font-medium mb-1 sm:mb-2">
-              Upload Event Image
-            </label>
-            <input
-              type="file"
-              name="images"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="
-                w-full 
-                border border-emerald-300 
-                bg-white/70 
-                p-2 
-                rounded-xl 
-                file:py-2 
-                file:px-4 
-                file:rounded-lg 
-                file:bg-emerald-500 
-                file:text-white 
-                file:border-none 
-                file:font-semibold
-                text-xs sm:text-sm
-                hover:file:bg-emerald-600 
-                transition
-              "
-            />
-          </motion.div>
+                  {step === 1 ? (
+                    <>
+                      <div className="grid gap-6 sm:grid-cols-2">
+                        <Input label="Date" name="date" type="date" min={todayInputValue()} leading={CalendarDays} value={values.date} onChange={update} error={errors.date} required />
+                        <Input
+                          label="Planned hours"
+                          name="hours"
+                          type="number"
+                          inputMode="decimal"
+                          min={1}
+                          max={24}
+                          step="0.5"
+                          leading={Clock3}
+                          hint="Credited hours come from the actual start and end."
+                          value={values.hours}
+                          onChange={update}
+                          error={errors.hours}
+                          required
+                        />
+                      </div>
+                      <Input
+                        label="Location"
+                        name="location"
+                        leading={MapPin}
+                        placeholder="e.g. Shanghumugham Beach, Thiruvananthapuram"
+                        value={values.location}
+                        onChange={update}
+                        error={errors.location}
+                        required
+                      />
+                    </>
+                  ) : null}
 
-          <motion.button
-            type="submit"
-            disabled={submitting}
-            whileHover={{ scale: submitting ? 1 : 1.05 }}
-            whileTap={{ scale: submitting ? 1 : 0.97 }}
-            className={`
-              w-full 
-              py-3 
-              rounded-xl 
-              text-white 
-              text-sm sm:text-lg 
-              font-semibold 
-              shadow-md 
-              transition
-              ${
-                submitting
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-              }
-            `}
-          >
-            {submitting ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : (
-              "✨ Create Event"
-            )}
-          </motion.button>
-        </form>
-      </motion.div>
-    </div>
+                  {step === 2 ? (
+                    <>
+                      <UploadZone label="Cover photo" file={image} onChange={setImage} hint="Shown on the event page and in the public album. You can skip this." />
+                      {image ? <Input label="Caption" name="caption" placeholder="What does the photo show?" value={values.caption} onChange={update} /> : null}
+                    </>
+                  ) : null}
+
+                  {step === 3 ? (
+                    <>
+                      <Preview values={values} image={image} />
+                      <p className="flex items-start gap-3 rounded-lg border border-line bg-canvas p-4 text-[14px] leading-relaxed text-fg-2">
+                        <Bell aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-700" />
+                        Publishing notifies every teacher and volunteer at your institution.
+                      </p>
+                    </>
+                  ) : null}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              {step > 0 ? (
+                <Button variant="outline" icon={ArrowLeft} onClick={() => setStep(step - 1)} disabled={submitting}>
+                  Back
+                </Button>
+              ) : (
+                <span />
+              )}
+              <Button type="submit" loading={submitting} arrow={step < STEPS.length - 1}>
+                {step < STEPS.length - 1 ? "Continue" : submitting ? "Publishing" : "Publish event"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
-};
-
-export default CreateEvent;
+}

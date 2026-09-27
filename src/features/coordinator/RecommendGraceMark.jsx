@@ -1,174 +1,146 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useMemo, useState } from "react";
+import { Award, CheckCircle2, Send } from "lucide-react";
 import { toast } from "react-toastify";
-import { FiUser, FiSend, FiBookOpen } from "react-icons/fi";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import { Select, Textarea } from "@/components/ui/Field";
+import Identity from "@/components/ui/Identity";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import api, { errorMessage, getList } from "@/lib/api";
+import useResource from "@/hooks/useResource";
 
-const RecommendGraceMark = () => {
-  const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState("");
+const MAX_MARKS = 100;
+
+export default function RecommendGraceMark() {
+  const students = useResource(() => getList("/api/coordinator/students", "students"), []);
+  const [studentId, setStudentId] = useState("");
   const [marks, setMarks] = useState("");
   const [reason, setReason] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [query, setQuery] = useState("");
 
-  const token = getToken();
+  const volunteers = useMemo(() => (students.data || []).filter((s) => s.role === "volunteer"), [students.data]);
+  const q = query.trim().toLowerCase();
+  const options = q ? volunteers.filter((s) => `${s.name} ${s.department}`.toLowerCase().includes(q)) : volunteers;
+  const selected = volunteers.find((s) => s._id === studentId);
+  const pending = selected?.pendingGraceRecommendation?.status === "pending";
 
-  const axiosInstance = axios.create({
-    baseURL: `${API_URL}/api/coordinator`,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
+  const submit = async (event) => {
+    event.preventDefault();
+    const next = {};
+    if (!studentId) next.studentId = "Choose a volunteer.";
+    const value = Number(marks);
+    if (!marks || !Number.isFinite(value) || value <= 0 || value > MAX_MARKS) next.marks = `Enter marks between 1 and ${MAX_MARKS}.`;
+    if (reason.trim().length < 10) next.reason = "Explain why, in at least 10 characters.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
 
-  // Fetch Students
-  const fetchStudents = async () => {
+    setSubmitting(true);
     try {
-      setLoading(true);
-      const res = await axiosInstance.get("/students");
-
-      if (res.data.success) {
-        const volunteers = res.data.students.filter((s) => s.role === "volunteer");
-        setStudents(volunteers);
-      } else {
-        toast.error("Failed to load students");
-      }
+      await api.post("/api/coordinator/recommendgracemark", { studentId, marks: value, reason: reason.trim() });
+      students.mutate((list) =>
+        (list || []).map((s) => (s._id === studentId ? { ...s, pendingGraceRecommendation: { status: "pending", marks: value, reason: reason.trim() } } : s))
+      );
+      toast.success(`Grace mark recommendation sent for ${selected.name}.`);
+      setStudentId("");
+      setMarks("");
+      setReason("");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Error fetching students");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  // Submit Grace Marks
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedStudent || !marks) {
-      toast.warn("Please select student and enter marks");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const res = await axiosInstance.post("/recommendgracemark", {
-        studentId: selectedStudent,
-        marks: Number(marks),
-        reason,
-      });
-
-      if (res.data.success) {
-        toast.success("Grace mark recommendation submitted!");
-        setSelectedStudent("");
-        setMarks("");
-        setReason("");
-      } else {
-        toast.error(res.data.message || "Failed to recommend grace mark");
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Server error");
+      toast.error(errorMessage(error, "We couldn't send that recommendation."));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6 md:p-8">
-      <div className="bg-white border-2 border-green-500 shadow-lg rounded-2xl 
-        p-5 sm:p-7 md:p-8 w-full max-w-md sm:max-w-lg">
+    <>
+      <PageHeader
+        eyebrow="Recognition"
+        title="Recommend a grace mark"
+        description="Suggest grace marks for a volunteer's service. A teacher at your institution reviews and approves it before it counts."
+      />
 
-        {/* Header */}
-        <h2 className="text-xl sm:text-2xl font-semibold text-green-700 mb-5 sm:mb-6 flex items-center gap-2">
-          <FiBookOpen className="text-green-600" /> Grace Mark Recommendation
-        </h2>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <Panel title="New recommendation">
+          {students.loading ? (
+            <div className="space-y-5">
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-28 w-full" />
+            </div>
+          ) : students.status === "error" ? (
+            <ErrorState size="sm" error={students.error} onRetry={students.reload} />
+          ) : volunteers.length ? (
+            <form onSubmit={submit} noValidate className="space-y-5">
+              <div>
+                <SearchInput value={query} onChange={setQuery} placeholder="Search volunteers" className="mb-2" />
+                <Select label="Volunteer" value={studentId} onChange={(e) => setStudentId(e.target.value)} error={errors.studentId} placeholder="Choose a volunteer" required>
+                  {options.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name} — {s.department}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              {pending ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-800">
+                  {selected.name} already has a recommendation awaiting teacher review. Wait for it to be resolved before sending another.
+                </p>
+              ) : null}
+              <div className="grid gap-5 sm:grid-cols-[10rem_1fr]">
+                <div>
+                  <label htmlFor="gm-marks" className="text-[13px] font-semibold text-fg">
+                    Marks
+                  </label>
+                  <input
+                    id="gm-marks"
+                    type="number"
+                    min={1}
+                    max={MAX_MARKS}
+                    value={marks}
+                    onChange={(e) => setMarks(e.target.value)}
+                    aria-invalid={errors.marks ? true : undefined}
+                    className="tabular mt-1.5 h-11 w-full rounded-lg border border-line bg-paper px-3.5 text-[15px] focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand/15"
+                  />
+                  {errors.marks ? <p className="mt-1.5 text-[13px] font-medium text-red-600">{errors.marks}</p> : null}
+                </div>
+                <Textarea label="Reason" rows={3} placeholder="What did they do to earn this?" value={reason} onChange={(e) => setReason(e.target.value)} error={errors.reason} required />
+              </div>
+              <Button type="submit" icon={Send} loading={submitting} disabled={pending}>
+                Send recommendation
+              </Button>
+            </form>
+          ) : (
+            <EmptyState size="sm" icon={Award} title="No volunteers yet" description="Grace marks can be recommended once students become NSS volunteers." />
+          )}
+        </Panel>
 
-        {/* Loading */}
-        {loading ? (
-          <p className="text-center text-green-600 py-4 animate-pulse text-sm sm:text-base">
-            Loading students...
+        <Panel title="How approval works" bodyClassName="space-y-4">
+          {[
+            ["1", "You recommend", "Marks and a reason, for one volunteer at a time."],
+            ["2", "A teacher reviews", "Any teacher at your institution can approve or reject it."],
+            ["3", "It's recorded", "Approved marks join the volunteer's grace history."],
+          ].map(([n, title, text]) => (
+            <div key={n} className="flex gap-3">
+              <span className="tabular flex size-7 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-bold text-white">{n}</span>
+              <div>
+                <p className="text-[14px] font-semibold text-fg">{title}</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{text}</p>
+              </div>
+            </div>
+          ))}
+          <p className="flex items-start gap-2 rounded-lg border border-line bg-canvas p-3 text-[12.5px] leading-relaxed text-muted">
+            <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-brand-700" />
+            Only one recommendation can be pending per volunteer at a time.
           </p>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
-
-            {/* Select Student */}
-            <div>
-              <label className="block font-medium text-gray-700 mb-1 sm:mb-2 text-sm sm:text-base">
-                Select NSS Volunteer
-              </label>
-              <select
-                value={selectedStudent}
-                onChange={(e) => setSelectedStudent(e.target.value)}
-                className="w-full border border-green-400 rounded-lg p-2 sm:p-3 
-                  text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select Volunteer</option>
-                {students.map((stu) => (
-                  <option key={stu._id} value={stu._id}>
-                    {stu.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Marks */}
-            <div>
-              <label className="block font-medium text-gray-700 mb-1 sm:mb-2 text-sm sm:text-base">
-                Marks to Recommend
-              </label>
-              <input
-                type="number"
-                value={marks}
-                onChange={(e) => setMarks(e.target.value)}
-                placeholder="e.g., 5"
-                className="w-full border border-green-400 rounded-lg p-2 sm:p-3 
-                  text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-
-            {/* Reason */}
-            <div>
-              <label className="block font-medium text-gray-700 mb-1 sm:mb-2 text-sm sm:text-base">
-                Reason (optional)
-              </label>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Describe the reason..."
-                rows="3"
-                className="w-full border border-green-400 rounded-lg p-2 sm:p-3 
-                  text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-              ></textarea>
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={submitting}
-              className={`
-                w-full flex items-center justify-center gap-2 text-white font-medium 
-                py-2 sm:py-3 rounded-lg text-sm sm:text-base transition
-                ${
-                  submitting
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-green-600 hover:bg-green-700"
-                }
-              `}
-            >
-              <FiSend size={18} />
-              {submitting ? "Submitting..." : "Submit Recommendation"}
-            </button>
-          </form>
-        )}
+        </Panel>
       </div>
-    </div>
+    </>
   );
-};
-
-export default RecommendGraceMark;
+}

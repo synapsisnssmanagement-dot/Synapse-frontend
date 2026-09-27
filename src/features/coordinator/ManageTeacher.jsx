@@ -1,291 +1,214 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CalendarRange, Presentation, UserPlus, X } from "lucide-react";
 import { toast } from "react-toastify";
-import {
-  FiUser,
-  FiCalendar,
-  FiCheckCircle,
-  FiUserPlus,
-  FiTrash2,
-} from "react-icons/fi";
-import { motion } from "framer-motion";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
+import Button, { IconButton } from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import DateBlock from "@/components/ui/DateBlock";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { Select } from "@/components/ui/Field";
+import Identity from "@/components/ui/Identity";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { Skeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage, getList } from "@/lib/api";
+import cx from "@/lib/cx";
+import { formatDate } from "@/lib/format";
+import { sortEvents } from "./data";
 
-const ManageTeacher = () => {
-  const [teachers, setTeachers] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [unassigning, setUnassigning] = useState(false);
+export default function ManageTeacher() {
+  const teachers = useResource(() => getList("/api/coordinator/teachers", "teachers"), []);
+  const events = useResource(() => getList("/api/coordinator/events", "events"), []);
+  const [eventId, setEventId] = useState("");
+  const [picked, setPicked] = useState([]);
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const token = getToken();
+  const active = useMemo(() => sortEvents((events.data || []).filter((e) => e.status !== "Completed" && e.status !== "Cancelled")), [events.data]);
+  const selected = active.find((e) => e._id === eventId);
+  const assignedIds = new Set((selected?.assignedTeacher || []).map((t) => String(t._id || t)));
+  const q = query.trim().toLowerCase();
+  const available = (teachers.data || []).filter(
+    (t) => !assignedIds.has(String(t._id)) && (!q || `${t.name} ${t.email} ${t.department}`.toLowerCase().includes(q))
+  );
 
-  const axiosConfig = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
+  const togglePick = (id) => setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // Fetch teachers
-  const fetchTeachers = async () => {
+  const assign = async () => {
+    setSaving(true);
     try {
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/teachers`,
-        axiosConfig
-      );
-      setTeachers(res.data.teachers || []);
+      await api.post("/api/coordinator/assign-teacher", { eventId, teacherIds: picked });
+      const added = (teachers.data || []).filter((t) => picked.includes(t._id));
+      events.mutate((list) => (list || []).map((e) => (e._id === eventId ? { ...e, assignedTeacher: [...(e.assignedTeacher || []), ...added] } : e)));
+      toast.success(`${added.length === 1 ? added[0].name : `${added.length} teachers`} assigned to ${selected.title}.`);
+      setPicked([]);
     } catch (error) {
-      console.error("Teacher Fetch Error:", error);
-      toast.error("Failed to fetch teachers");
-    }
-  };
-
-  // Fetch events
-  const fetchEvents = async () => {
-    try {
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/events`,
-        axiosConfig
-      );
-      setEvents(res.data.events || []);
-    } catch (error) {
-      console.error("Event Fetch Error:", error);
-      toast.error("Failed to fetch events");
-    }
-  };
-
-  useEffect(() => {
-    fetchTeachers();
-    fetchEvents();
-  }, []);
-
-  // Assign teacher
-  const handleAssign = async () => {
-    if (!selectedTeacher || !selectedEvent) {
-      toast.warning("Please select both teacher and event");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await axios.post(
-        `${API_URL}/api/coordinator/assign-teacher`,
-        {
-          eventId: selectedEvent,
-          teacherIds: [selectedTeacher],
-        },
-        axiosConfig
-      );
-
-      toast.success(res.data.message || "Teacher assigned successfully!");
-      setSelectedTeacher("");
-      setSelectedEvent("");
-      fetchEvents();
-    } catch (error) {
-      console.error("Assign Teacher Error:", error);
-      toast.error(error.response?.data?.message || "Error assigning teacher");
+      toast.error(errorMessage(error, "We couldn't assign those teachers."));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  // Unassign Teacher
-  const handleUnassign = async (eventId, teacherId) => {
+  const unassign = async () => {
+    const { event, teacher } = removing;
+    setBusy(true);
     try {
-      setUnassigning(true);
-      const res = await axios.delete(
-        `${API_URL}/api/coordinator/unassign-teacher`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          data: { eventId, teacherId },
-        }
+      await api.delete("/api/coordinator/unassign-teacher", { data: { eventId: event._id, teacherId: teacher._id } });
+      events.mutate((list) =>
+        (list || []).map((e) => (e._id === event._id ? { ...e, assignedTeacher: (e.assignedTeacher || []).filter((t) => String(t._id || t) !== String(teacher._id)) } : e))
       );
-
-      toast.success(res.data.message || "Teacher unassigned successfully!");
-      fetchEvents();
+      toast.success(`${teacher.name} removed from ${event.title}.`);
+      setRemoving(null);
     } catch (error) {
-      console.error("Unassign Teacher Error:", error);
-      toast.error(error.response?.data?.message || "Error unassigning teacher");
+      toast.error(errorMessage(error, "We couldn't remove that teacher."));
     } finally {
-      setUnassigning(false);
+      setBusy(false);
     }
   };
+
+  const loading = teachers.loading || events.loading;
+  const failed = teachers.status === "error" ? teachers : events.status === "error" ? events : null;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-green-50 to-white min-h-screen">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="mb-6"
-      >
-        <h2 className="text-2xl sm:text-3xl font-bold text-green-700 flex items-center gap-2">
-          <FiUser className="text-green-600" /> Manage Teachers
-        </h2>
-        <p className="text-gray-500 text-sm mt-1">
-          Assign or unassign teachers to events.
-        </p>
-      </motion.div>
+    <>
+      <PageHeader
+        eyebrow="People"
+        title="Teachers"
+        description="Every drive needs at least one teacher to take attendance on the day. Assign them here; they are notified straight away."
+        meta={teachers.data ? <span>{teachers.data.length} active teachers at your institution</span> : null}
+      />
 
-      {/* Assignment Card */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-        className="bg-white shadow-lg border border-green-100 rounded-2xl p-4 sm:p-6 mb-10"
-      >
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-5 flex items-center gap-2">
-          <FiUserPlus className="text-green-600" /> Assign Teacher to Event
-        </h3>
+      {failed ? (
+        <ErrorState title="We couldn't load teachers and events" error={failed.error} onRetry={() => { teachers.reload(); events.reload(); }} />
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
+          <Panel title="Assign teachers" description="Choose an event, then the teachers to add." className="h-fit xl:sticky xl:top-0">
+            {loading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-40 w-full" />
+              </div>
+            ) : active.length ? (
+              <div className="space-y-5">
+                <Select
+                  label="Event"
+                  value={eventId}
+                  onChange={(e) => {
+                    setEventId(e.target.value);
+                    setPicked([]);
+                  }}
+                  placeholder="Choose an upcoming or live event"
+                >
+                  {active.map((e) => (
+                    <option key={e._id} value={e._id}>
+                      {e.title} — {formatDate(e.date, "short")}
+                    </option>
+                  ))}
+                </Select>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Select Teacher */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Select Teacher
-            </label>
-            <select
-              value={selectedTeacher}
-              onChange={(e) => setSelectedTeacher(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-500 outline-none"
-            >
-              <option value="">Choose Teacher</option>
-              {teachers.map((t) => (
-                <option key={t._id} value={t._id}>
-                  {t.name} ({t.department})
-                </option>
-              ))}
-            </select>
-          </div>
+                {selected ? (
+                  <>
+                    <SearchInput value={query} onChange={setQuery} placeholder="Search teachers" />
+                    {available.length ? (
+                      <fieldset>
+                        <legend className="sr-only">Teachers to assign</legend>
+                        <ul data-lenis-prevent className="scrollbar-quiet max-h-80 divide-y divide-line overflow-y-auto rounded-lg border border-line">
+                          {available.map((t) => (
+                            <li key={t._id}>
+                              <label className={cx("flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-canvas", picked.includes(t._id) && "bg-mint/70")}>
+                                <input type="checkbox" checked={picked.includes(t._id)} onChange={() => togglePick(t._id)} className="size-4 accent-brand-700" />
+                                <Identity name={t.name} meta={t.department || t.email} />
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      </fieldset>
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-line-strong p-4 text-[13.5px] text-muted">
+                        {q ? "No teachers match your search." : "Every active teacher is already on this event."}
+                      </p>
+                    )}
+                    <Button fullWidth icon={UserPlus} disabled={!picked.length} loading={saving} onClick={assign}>
+                      {picked.length ? `Assign ${picked.length} ${picked.length === 1 ? "teacher" : "teachers"}` : "Select teachers to assign"}
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            ) : (
+              <EmptyState size="sm" icon={CalendarRange} title="No upcoming events" description="Create an event first, then assign its teachers here." />
+            )}
+          </Panel>
 
-          {/* Select Event */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Select Event
-            </label>
-            <select
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-500 outline-none"
-            >
-              <option value="">Choose Event</option>
-              {events.map((e) => (
-                <option key={e._id} value={e._id}>
-                  {e.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Assign Button */}
-          <div className="flex items-end">
-            <button
-              onClick={handleAssign}
-              disabled={loading}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-all shadow-md text-sm"
-            >
-              <FiCheckCircle />
-              {loading ? "Assigning..." : "Assign Teacher"}
-            </button>
-          </div>
+          <section aria-labelledby="assignments-title">
+            <h2 id="assignments-title" className="eyebrow mb-3 text-muted">
+              Assignments
+            </h2>
+            {loading ? (
+              <TableSkeleton rows={4} columns={3} />
+            ) : active.length ? (
+              <ul className="space-y-3">
+                {active.map((event) => {
+                  const assigned = (event.assignedTeacher || []).filter((t) => t && typeof t === "object");
+                  return (
+                    <li key={event._id} className={cx("rounded-xl border bg-paper p-4 sm:p-5", event._id === eventId ? "border-ink" : "border-line")}>
+                      <div className="flex items-start gap-4">
+                        <DateBlock date={event.date} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-[15px] font-semibold text-fg">{event.title}</p>
+                            <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+                          </div>
+                          {assigned.length ? (
+                            <ul className="mt-3 flex flex-wrap gap-2">
+                              {assigned.map((t) => (
+                                <li key={t._id} className="flex items-center gap-1.5 rounded-full border border-line bg-canvas py-1 pl-3 pr-1 text-[13px] font-medium text-fg">
+                                  {t.name}
+                                  <IconButton size="sm" label={`Remove ${t.name} from ${event.title}`} icon={X} onClick={() => setRemoving({ event, teacher: t })} className="size-6 rounded-full" />
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 flex items-center gap-2 text-[13px] font-medium text-amber-700">
+                              <AlertTriangle aria-hidden="true" className="size-3.5" /> No teacher yet — attendance can&apos;t be taken.
+                            </p>
+                          )}
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => { setEventId(event._id); setPicked([]); }} className="hidden sm:inline-flex">
+                          Add
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyState icon={Presentation} title="Nothing to staff yet" description="Upcoming and live events will appear here with their teachers." />
+            )}
+            {teachers.data && !teachers.data.length ? (
+              <p className="mt-4">
+                <Badge tone="warning">No active teachers</Badge>
+                <span className="ml-2 text-[13px] text-muted">Teachers appear once an administrator approves their accounts.</span>
+              </p>
+            ) : null}
+          </section>
         </div>
-      </motion.div>
+      )}
 
-      {/* Assigned Teachers Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="bg-white shadow-md rounded-2xl p-4 sm:p-6 border border-green-100"
-      >
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4 flex items-center gap-2">
-          <FiCalendar className="text-green-600" /> Assigned Events
-        </h3>
-
-        {events.length === 0 ? (
-          <p className="text-gray-500 text-center py-6">
-            No events found. Please assign a teacher.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-green-100 text-green-800 text-xs sm:text-sm">
-                  <th className="px-4 sm:px-6 py-3 border-b text-left font-semibold">
-                    Event
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 border-b text-left font-semibold">
-                    Teachers
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 border-b text-left font-semibold">
-                    Departments
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 border-b text-center font-semibold">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {events.map((event, idx) => (
-                  <motion.tr
-                    key={event._id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="hover:bg-green-50 border-b"
-                  >
-                    <td className="px-4 sm:px-6 py-3 text-gray-800 font-medium">
-                      {event.title}
-                    </td>
-
-                    <td className="px-4 sm:px-6 py-3 text-gray-700">
-                      {event.assignedTeacher?.length
-                        ? event.assignedTeacher.map((t) => t.name).join(", ")
-                        : "Not Assigned"}
-                    </td>
-
-                    <td className="px-4 sm:px-6 py-3 text-gray-600">
-                      {event.assignedTeacher?.length
-                        ? event.assignedTeacher
-                            .map((t) => t.department)
-                            .join(", ")
-                        : "-"}
-                    </td>
-
-                    <td className="px-4 sm:px-6 py-3 text-center">
-                      {event.assignedTeacher?.length ? (
-                        event.assignedTeacher.map((teacher) => (
-                          <button
-                            key={teacher._id}
-                            disabled={unassigning}
-                            onClick={() =>
-                              handleUnassign(event._id, teacher._id)
-                            }
-                            className="bg-red-100 text-red-700 px-3 py-1 rounded-md text-xs font-medium hover:bg-red-200 inline-flex items-center gap-1 mr-2"
-                          >
-                            <FiTrash2 size={13} />
-                            {unassigning ? "…" : "Unassign"}
-                          </button>
-                        ))
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </motion.div>
-    </div>
+      <ConfirmDialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        onConfirm={unassign}
+        loading={busy}
+        title={`Remove ${removing?.teacher.name || "this teacher"}?`}
+        confirmLabel="Remove teacher"
+        description={`${removing?.teacher.name || "They"} will no longer be able to take attendance for ${removing?.event.title || "this event"}. They'll be notified.`}
+      />
+    </>
   );
-};
-
-export default ManageTeacher;
+}

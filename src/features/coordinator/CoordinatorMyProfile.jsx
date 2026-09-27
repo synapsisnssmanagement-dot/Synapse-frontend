@@ -1,296 +1,116 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { Building2, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { toast } from "react-toastify";
+import Avatar from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { Input } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { ProfileSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
+import UploadZone from "@/components/ui/UploadZone";
+import api, { errorMessage } from "@/lib/api";
+import { useCoordinatorProfile } from "./data";
 
-const CoordinatorMyProfile = () => {
-  const [profile, setProfile] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [formData, setFormData] = useState({});
-  const [imageFile, setImageFile] = useState(null);
-  const [preview, setPreview] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+function ProfileForm({ profile, onSaved }) {
+  const [values, setValues] = useState({ name: profile.name || "", phone: profile.phone || "", department: profile.department || "" });
+  const [photo, setPhoto] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  const API_BASE_URL = `${API_URL}/api/coordinator`;
-
-  // Load profile
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = getToken();
-        const res = await axios.get(`${API_BASE_URL}/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const data = res.data.data;
-        setProfile(data);
-        setFormData({
-          name: data.name || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          department: data.department || "",
-          institutionName: data.institutionName || "",
-          institution: data.institution || "",
-        });
-        setPreview(data.profileImage || "/default-avatar.png");
-      } catch (err) {
-        console.error("Profile load error:", err);
-        setMessage("Failed to load profile.");
-      }
-    };
-    fetchProfile();
-  }, []);
-
-  // Handle input
-  const handleChange = (e) => {
-    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const update = (event) => {
+    const { name, value } = event.target;
+    setValues((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  // Image preview
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      setPreview(URL.createObjectURL(file));
-    }
-  };
+  const submit = async (event) => {
+    event.preventDefault();
+    const next = {};
+    if (values.name.trim().length < 2) next.name = "Enter your name.";
+    if (values.phone.replace(/\D/g, "").length < 10) next.phone = "Enter a phone number with at least 10 digits.";
+    if (!values.department.trim()) next.department = "Enter your department.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
 
-  // Update profile
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-
+    setSaving(true);
+    const form = new FormData();
+    form.append("name", values.name.trim());
+    form.append("phone", values.phone.trim());
+    form.append("department", values.department.trim());
+    if (photo) form.append("profileImage", photo);
     try {
-      const token = getToken();
-      const form = new FormData();
-
-      form.append("name", formData.name);
-      form.append("phone", formData.phone);
-      form.append("department", formData.department);
-      form.append("institution", formData.institution);
-      if (imageFile) form.append("profileImage", imageFile);
-
-      const res = await axios.put(`${API_BASE_URL}/updateProfile`, form, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      const updated = res.data.data;
-      setProfile(updated);
-      setFormData(updated);
-      setPreview(updated.profileImage);
-
-      setEditMode(false);
-      setMessage("✅ Profile updated successfully!");
-    } catch (err) {
-      console.error("Update error:", err);
-      setMessage("❌ Failed to update profile");
+      const res = await api.put("/api/coordinator/updateProfile", form);
+      toast.success("Profile saved.");
+      localStorage.setItem("name", values.name.trim());
+      onSaved({ ...profile, ...values, ...(res.data?.data || {}) });
+      setPhoto(null);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't save your profile."));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
-
-  if (!profile)
-    return (
-      <div className="text-center text-gray-400 py-14 text-lg font-medium">
-        Loading profile...
-      </div>
-    );
 
   return (
-    <section
-      className="
-        min-h-screen w-full 
-        flex justify-center items-center 
-        px-4 py-12 
-        
-      "
-    >
-      <motion.div
-        className="
-          w-full max-w-lg 
-          bg-white/10 backdrop-blur-xl 
-          border border-white/20 
-          rounded-3xl shadow-2xl 
-          p-8 sm:p-10
-        "
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.45 }}
-      >
-        {/* Title */}
-        <h2 className="
-          text-3xl sm:text-4xl font-bold 
-          text-center mb-8
-          text-transparent bg-clip-text 
-          bg-gradient-to-r from-green-700 to-green-700
-        ">
-          My Profile
-        </h2>
-
-        {/* Image */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="relative group">
-            <img
-              src={preview}
-              alt="Profile"
-              className="
-                w-28 h-28 sm:w-32 sm:h-32 
-                rounded-full object-cover 
-                border-2 border-green-400 
-                shadow-lg transition-all
-                group-hover:scale-105
-              "
-            />
-
-            {editMode && (
-              <label className="
-                absolute bottom-1 right-1 
-                bg-green-500 hover:bg-green-400
-                text-xs px-2 py-1 rounded-md cursor-pointer shadow-md
-              ">
-                Change
-                <input hidden type="file" accept="image/*" onChange={handleImageChange} />
-              </label>
-            )}
-          </div>
+    <form onSubmit={submit} noValidate className="space-y-6">
+      <Panel title="Photo">
+        <UploadZone shape="avatar" file={photo} onChange={setPhoto} hint="Shown to your institution's teachers and volunteers." />
+      </Panel>
+      <Panel title="Personal details">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Input label="Full name" name="name" leading={UserRound} value={values.name} onChange={update} error={errors.name} required />
+          <Input label="Phone number" name="phone" type="tel" leading={Phone} value={values.phone} onChange={update} error={errors.phone} required />
+          <Input label="Department" name="department" leading={Building2} value={values.department} onChange={update} error={errors.department} required className="sm:col-span-2" />
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name */}
-          <InputField
-            label="Name"
-            name="name"
-            value={formData.name}
-            editable={editMode}
-            onChange={handleChange}
-          />
-
-          {/* Email */}
-          <InputField
-            label="Email"
-            value={formData.email}
-            editable={false}
-          />
-
-          {/* Phone */}
-          <InputField
-            label="Phone"
-            name="phone"
-            value={formData.phone}
-            editable={editMode}
-            onChange={handleChange}
-          />
-
-          {/* Department */}
-          <InputField
-            label="Department"
-            name="department"
-            value={formData.department}
-            editable={editMode}
-            onChange={handleChange}
-          />
-
-          {/* Institution */}
-          <InputField
-            label="Institution"
-            value={formData.institutionName}
-            editable={false}
-          />
-
-          {/* Buttons */}
-          <div className="text-center pt-4">
-            {!editMode ? (
-              <button
-                onClick={() => setEditMode(true)}
-                type="button"
-                className="
-                  px-7 py-2.5 rounded-lg 
-                  bg-green-600 hover:bg-green-500 
-                  transition shadow-md text-white font-semibold
-                "
-              >
-                Edit Profile
-              </button>
-            ) : (
-              <div className="flex gap-3 justify-center">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="
-                    px-7 py-2.5 rounded-lg 
-                    bg-green-600 hover:bg-green-500 
-                    transition shadow-md text-white font-semibold
-                    disabled:opacity-50
-                  "
-                >
-                  {loading ? "Updating..." : "Save"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditMode(false);
-                    setFormData(profile);
-                    setPreview(profile.profileImage);
-                    setImageFile(null);
-                  }}
-                  className="
-                    px-7 py-2.5 rounded-lg 
-                    bg-gray-600 hover:bg-gray-500 
-                    transition shadow-md text-white font-semibold
-                  "
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        </form>
-
-        {/* Status Message */}
-        {message && (
-          <p
-            className={`
-              text-center text-sm mt-5 
-              ${message.startsWith("✅") ? "text-green-400" : "text-red-400"}
-            `}
-          >
-            {message}
-          </p>
-        )}
-      </motion.div>
-    </section>
+      </Panel>
+      <div className="flex justify-end">
+        <Button type="submit" loading={saving}>
+          Save changes
+        </Button>
+      </div>
+    </form>
   );
-};
+}
 
-/* Reusable Input Component */
-const InputField = ({ label, editable, name, value, onChange }) => (
-  <div>
-    <label className="block text-sm text-gray-300 mb-1">{label}</label>
-    <input
-      name={name}
-      value={value}
-      disabled={!editable}
-      onChange={onChange}
-      className={`
-        w-full px-3 py-2 rounded-lg 
-        bg-black/40 text-gray-200
-        border 
-        ${editable ? "border-green-400" : "border-green-700"}
-        focus:outline-none focus:ring-1 focus:ring-green-400
-        transition
-      `}
-    />
-  </div>
-);
+export default function CoordinatorMyProfile() {
+  const profile = useCoordinatorProfile();
 
-export default CoordinatorMyProfile;
+  return (
+    <>
+      <PageHeader eyebrow="Account" title="Your profile" description="Keep your details current so your institution and volunteers can reach you." />
+      {profile.loading ? (
+        <ProfileSkeleton />
+      ) : profile.status === "error" || !profile.data ? (
+        <ErrorState title="We couldn't load your profile" error={profile.error} onRetry={profile.reload} />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl bg-ink p-6 text-on-dark">
+            <Avatar src={profile.data.profileImage} name={profile.data.name} size="xl" className="ring-4 ring-white/10" />
+            <p className="mt-5 text-xl font-semibold tracking-[-0.02em] text-white">{profile.data.name}</p>
+            <p className="mt-1 text-[13.5px] text-on-dark/60">{profile.data.email}</p>
+            <div className="mt-4">
+              <Badge tone="live" icon={ShieldCheck}>
+                Coordinator
+              </Badge>
+            </div>
+            <dl className="mt-6 space-y-3 border-t border-white/10 pt-5 text-[13.5px]">
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Institution</dt>
+                <dd className="text-right text-white">{profile.data.institutionName || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Department</dt>
+                <dd className="text-right text-white">{profile.data.department || "—"}</dd>
+              </div>
+            </dl>
+          </aside>
+          <ProfileForm key={profile.data.name} profile={profile.data} onSaved={(next) => profile.mutate(next)} />
+        </div>
+      )}
+    </>
+  );
+}

@@ -1,158 +1,158 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useId, useMemo, useState } from "react";
+import { Check, EyeOff, Lock, Quote } from "lucide-react";
 import { toast } from "react-toastify";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Identity from "@/components/ui/Identity";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage, getList } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
 
-const ManageTestimonials = () => {
-  const [testimonials, setTestimonials] = useState([]);
-  const [loading, setLoading] = useState(true);
+const FILTERS = [
+  { id: "pending", label: "Awaiting review" },
+  { id: "approved", label: "On the website" },
+  { id: "rejected", label: "Hidden" },
+  { id: "all", label: "All" },
+];
 
-  const token = getToken();
+export default function ManageTestimonials() {
+  const tabsId = useId();
+  const list = useResource(() => getList("/api/alumni/testimonials", "testimonials"), []);
+  const [filter, setFilter] = useState("pending");
+  const [busy, setBusy] = useState(null);
 
-  const fetchTestimonials = async () => {
+  const rows = useMemo(() => list.data || [], [list.data]);
+  const counts = useMemo(() => {
+    const out = { pending: 0, approved: 0, rejected: 0, all: rows.length };
+    rows.forEach((t) => {
+      const v = t.visibility || "pending";
+      if (out[v] != null) out[v] += 1;
+    });
+    return out;
+  }, [rows]);
+  const visible = filter === "all" ? rows : rows.filter((t) => (t.visibility || "pending") === filter);
+
+  const setVisibility = async (item, visibility) => {
+    setBusy(`${item.testimonialId}:${visibility}`);
     try {
-      const res = await axios.get(
-        `${API_URL}/api/alumni/testimonials`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setTestimonials(res.data.testimonials || []);
+      await api.put(`/api/alumni/${item.alumniId}/testimonial/${item.testimonialId}/visibility`, { visibility });
+      list.mutate((current) => (current || []).map((t) => (t.testimonialId === item.testimonialId ? { ...t, visibility } : t)));
+      toast.success(visibility === "approved" ? "Published on the website." : "Hidden from the website.");
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to load testimonials");
+      toast.error(errorMessage(error, "We couldn't update that testimonial."));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   };
 
-  useEffect(() => {
-    fetchTestimonials();
-  }, []);
+  const header = (
+    <PageHeader
+      eyebrow="Community"
+      title="Testimonials"
+      description="Alumni reflections, reviewed before they appear in the Voices section of the public website."
+    />
+  );
 
-  const updateVisibility = async (alumniId, testimonialId, visibility) => {
-    try {
-      await axios.put(
-        `${API_URL}/api/alumni/${alumniId}/testimonial/${testimonialId}/visibility`,
-        { visibility },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      setTestimonials((prev) =>
-        prev.map((t) =>
-          t.testimonialId === testimonialId ? { ...t, visibility } : t
-        )
-      );
-
-      toast.success(`Testimonial ${visibility} successfully`);
-    } catch (error) {
-      console.error(error);
-      toast.error("Error updating testimonial");
-    }
-  };
-
-  if (loading)
+  if (list.loading) {
     return (
-      <div className="text-center mt-10 text-gray-600">
-        Loading testimonials...
-      </div>
+      <>
+        {header}
+        <CardGridSkeleton count={4} className="xl:grid-cols-2" />
+      </>
     );
+  }
+
+  if (list.status === "error") {
+    const forbidden = list.error?.response?.status === 403;
+    return (
+      <>
+        {header}
+        {forbidden ? (
+          <EmptyState
+            icon={Lock}
+            title="Only the super admin can moderate testimonials"
+            description="Ask your super admin to review alumni testimonials, or sign in with that account."
+          />
+        ) : (
+          <ErrorState title="We couldn't load testimonials" error={list.error} onRetry={list.reload} />
+        )}
+      </>
+    );
+  }
 
   return (
-    <div className="p-4 sm:p-6">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900">
-        Manage Testimonials
-      </h1>
-
-      <div className="grid gap-4 sm:gap-6">
-        {testimonials.length === 0 ? (
-          <p className="text-center text-gray-500">No testimonials found</p>
+    <>
+      {header}
+      <Tabs
+        id={tabsId}
+        label="Filter testimonials"
+        className="mb-6"
+        value={filter}
+        onChange={setFilter}
+        tabs={FILTERS.map((f) => ({ ...f, count: counts[f.id] }))}
+      />
+      <div {...tabPanelProps(tabsId, filter)}>
+        {visible.length ? (
+          <ul className="grid gap-4 xl:grid-cols-2">
+            {visible.map((item) => {
+              const visibility = item.visibility || "pending";
+              return (
+                <li key={item.testimonialId} className="flex flex-col rounded-xl border border-line bg-paper">
+                  <figure className="flex flex-1 flex-col p-6">
+                    <Quote aria-hidden="true" className="size-5 text-brand-700" />
+                    <blockquote className="mt-4 flex-1 font-display text-[1.35rem] leading-snug tracking-[-0.01em] text-ink">{item.message}</blockquote>
+                    <figcaption className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                      <Identity
+                        name={item.name}
+                        src={item.profileImage}
+                        meta={[item.department, item.graduationYear && `Class of ${item.graduationYear}`].filter(Boolean).join(" · ") || "Alumni"}
+                      />
+                      <span className="text-[12.5px] text-subtle">{timeAgo(item.createdAt)}</span>
+                    </figcaption>
+                  </figure>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-canvas px-6 py-3">
+                    <StatusBadge status={visibility} label={visibility === "approved" ? "Published" : visibility === "rejected" ? "Hidden" : "Awaiting review"} />
+                    <div className="flex gap-2">
+                      {visibility !== "rejected" ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={EyeOff}
+                          loading={busy === `${item.testimonialId}:rejected`}
+                          onClick={() => setVisibility(item, "rejected")}
+                        >
+                          Hide
+                        </Button>
+                      ) : null}
+                      {visibility !== "approved" ? (
+                        <Button size="sm" icon={Check} loading={busy === `${item.testimonialId}:approved`} onClick={() => setVisibility(item, "approved")}>
+                          Publish
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         ) : (
-          testimonials.map((t) => (
-            <div
-              key={t.testimonialId}
-              className="bg-white shadow-md rounded-2xl border p-4 sm:p-6 flex flex-col sm:flex-row gap-4"
-            >
-              {/* Profile Image */}
-              <div className="flex-shrink-0 flex justify-center sm:block">
-                <img
-                  src={t.profileImage || "/default-avatar.png"}
-                  alt="alumni"
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border shadow"
-                />
-              </div>
-
-              {/* Content */}
-              <div className="flex-1">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                  {t.name}
-                </h2>
-
-                <p className="text-gray-600 text-sm">
-                  {t.department} • {t.graduationYear}
-                </p>
-
-                <p className="mt-3 text-gray-700 leading-relaxed text-sm sm:text-base">
-                  {t.message}
-                </p>
-
-                <p className="mt-2 text-sm">
-                  <span className="font-semibold">Status: </span>
-                  <span
-                    className={`font-semibold px-3 py-1 rounded-full text-xs sm:text-sm ${
-                      t.visibility === "approved"
-                        ? "bg-green-100 text-green-700"
-                        : t.visibility === "rejected"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
-                    {t.visibility}
-                  </span>
-                </p>
-
-                {/* Buttons */}
-                <div className="flex flex-wrap gap-3 mt-4">
-                  <button
-                    onClick={() =>
-                      updateVisibility(t.alumniId, t.testimonialId, "approved")
-                    }
-                    disabled={t.visibility === "approved"}
-                    className={`px-4 py-2 rounded-lg text-white text-sm sm:text-base ${
-                      t.visibility === "approved"
-                        ? "bg-green-300 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    Approve
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      updateVisibility(t.alumniId, t.testimonialId, "rejected")
-                    }
-                    disabled={t.visibility === "rejected"}
-                    className={`px-4 py-2 rounded-lg text-white text-sm sm:text-base ${
-                      t.visibility === "rejected"
-                        ? "bg-red-300 cursor-not-allowed"
-                        : "bg-red-600 hover:bg-red-700"
-                    }`}
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
+          <EmptyState
+            icon={Quote}
+            title={filter === "pending" ? "Nothing to review" : filter === "approved" ? "No published testimonials" : filter === "rejected" ? "Nothing hidden" : "No testimonials yet"}
+            description={
+              filter === "pending"
+                ? "When alumni share a reflection, it waits here until you publish or hide it."
+                : "Testimonials move here when you change their visibility."
+            }
+          />
         )}
       </div>
-    </div>
+    </>
   );
-};
-
-export default ManageTestimonials;
+}

@@ -1,183 +1,89 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { FiDownload, FiActivity } from "react-icons/fi";
+import { useState } from "react";
+import { Download, FileText } from "lucide-react";
 import { toast } from "react-toastify";
-import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import DateBlock from "@/components/ui/DateBlock";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import api, { errorMessage, getList } from "@/lib/api";
+import cx from "@/lib/cx";
+import { formatDate, participantCount } from "@/lib/format";
+import useResource from "@/hooks/useResource";
 
-const EventReportGenerator = () => {
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const navigate = useRouter();
+export default function EventReportGenerator() {
+  const events = useResource(
+    () => getList("/api/coordinator/events", "events").then((list) => list.filter((e) => e.status === "Completed")),
+    []
+  );
+  const [query, setQuery] = useState("");
+  const [downloadingId, setDownloadingId] = useState(null);
 
-  const token = getToken();
+  const q = query.trim().toLowerCase();
+  const rows = (events.data || []).filter((e) => !q || e.title.toLowerCase().includes(q));
 
-  const axiosInstance = axios.create({
-    baseURL: `${API_URL}/api/coordinator`,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  // Fetch Completed Events
-  const fetchCompletedEvents = async () => {
-    if (!token) {
-      toast.error("Please login first.");
-      navigate.push("/login");
-      return;
-    }
-
+  const download = async (event) => {
+    setDownloadingId(event._id);
     try {
-      const res = await axiosInstance.get("/events");
-      const completed = res.data.events.filter((e) => e.status === "Completed");
-      setEvents(completed);
-    } catch (error) {
-      console.error("Fetch error:", error);
-      if (error.response?.status === 401) {
-        toast.error("Session expired. Please login again.");
-        navigate.push("/login");
-      } else {
-        toast.error("Failed to fetch completed events");
-      }
-    }
-  };
-
-  useEffect(() => {
-    fetchCompletedEvents();
-  }, []);
-
-  // Generate PDF
-  const generateReport = async () => {
-    if (!selectedEvent) return toast.warn("Please select an event first");
-    setLoading(true);
-
-    try {
-      const response = await axios.post(
-        `${API_URL}/api/coordinator/pdfgeneration/${selectedEvent._id}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const res = await api.post(`/api/coordinator/pdfgeneration/${event._id}`, {}, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `${selectedEvent.title}_Report.pdf`);
+      link.download = `${event.title.replace(/[^\w\- ]+/g, "").trim() || "event"}_report.pdf`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-
-      toast.success("Report generated successfully!");
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Report generation error:", error);
-      if (error.response?.status === 401) {
-        toast.error("Unauthorized. Please login again.");
-        navigate.push("/login");
-      } else {
-        toast.error("Failed to generate report");
-      }
+      toast.error(errorMessage(error, "We couldn't generate that report."));
     } finally {
-      setLoading(false);
+      setDownloadingId(null);
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-green-50 p-4 sm:p-6 md:p-10">
-      {/* Main Content */}
-      <main className="flex-1 w-full mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3 mb-6">
-          <FiActivity className="text-green-700 text-3xl sm:text-4xl" />
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-green-800">
-            Generate Event Reports
-          </h2>
-        </div>
+    <>
+      <PageHeader
+        eyebrow="Reports"
+        title="Event reports"
+        description="A PDF attendance report for any completed event — participant list, department and total volunteer count."
+        actions={rows.length ? <SearchInput value={query} onChange={setQuery} placeholder="Search completed events" className="w-64" /> : null}
+      />
 
-        {/* Report Card */}
-        <div className="bg-white shadow-xl rounded-2xl p-5 sm:p-8 border-l-4 border-green-700 hover:shadow-green-200 transition-all">
-          <h3 className="text-lg sm:text-xl font-semibold mb-4 text-green-800">
-            Select Completed Event
-          </h3>
-
-          {/* Event Dropdown */}
-          {events.length === 0 ? (
-            <p className="text-gray-500 italic text-sm sm:text-base">
-              No completed events available.
-            </p>
-          ) : (
-            <select
-              className="
-                border-2 border-green-300 
-                focus:border-green-700 
-                focus:ring-green-700 
-                focus:ring-1
-                outline-none 
-                transition 
-                p-3 
-                rounded-lg 
-                w-full 
-                bg-green-50 
-                text-sm
-                sm:text-base
-                mb-6
-              "
-              onChange={(e) => {
-                const ev = events.find((x) => x._id === e.target.value);
-                setSelectedEvent(ev);
-              }}
+      {events.loading ? (
+        <CardGridSkeleton count={4} className="xl:grid-cols-2" />
+      ) : events.status === "error" ? (
+        <ErrorState error={events.error} onRetry={events.reload} />
+      ) : rows.length ? (
+        <ul className="grid gap-3 xl:grid-cols-2">
+          {rows.map((event) => (
+            <li
+              key={event._id}
+              className={cx("flex items-center gap-4 rounded-xl border border-line bg-paper p-4", downloadingId === event._id && "opacity-80")}
             >
-              <option value=""> Select Event </option>
-              {events.map((ev) => (
-                <option key={ev._id} value={ev._id}>a
-                  {ev.title} ({new Date(ev.date).toLocaleDateString()})
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Generate Button */}
-          <button
-            onClick={generateReport}
-            disabled={loading || !selectedEvent}
-            className={`flex items-center justify-center gap-2 px-5 py-3 sm:px-6 sm:py-3 
-              rounded-lg text-white font-medium 
-              text-sm sm:text-lg shadow-md w-full sm:w-auto transition
-              ${
-                loading || !selectedEvent
-                  ? "bg-green-300 cursor-not-allowed"
-                  : "bg-green-700 hover:bg-green-800"
-              }
-            `}
-          >
-            {loading ? (
-              <>
-                <span className="animate-spin border-t-2 border-white rounded-full w-4 h-4"></span>
-                Generating...
-              </>
-            ) : (
-              <>
-                <FiDownload /> Generate PDF Report
-              </>
-            )}
-          </button>
-
-          {/* Loading Message */}
-          {loading && (
-            <p className="text-sm text-green-700 mt-3 animate-pulse">
-              Please wait, generating your report...
-            </p>
-          )}
-        </div>
-      </main>
-    </div>
+              <DateBlock date={event.date} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold text-fg">{event.title}</p>
+                <p className="mt-1 text-[13px] text-muted">
+                  {formatDate(event.date)} · {participantCount(event)} participants
+                </p>
+              </div>
+              <Button size="sm" variant="outline" icon={Download} loading={downloadingId === event._id} onClick={() => download(event)}>
+                PDF
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          icon={FileText}
+          title={q ? "No matches" : "No completed events yet"}
+          description={q ? "Try a different name." : "Reports become available once you complete an event."}
+        />
+      )}
+    </>
   );
-};
-
-export default EventReportGenerator;
+}

@@ -1,156 +1,115 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { FiCalendar, FiMapPin, FiClock, FiRefreshCcw } from "react-icons/fi";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { CalendarDays, HandCoins, Lock, MapPin, Unlock, Users } from "lucide-react";
 import { toast } from "react-toastify";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import DateBlock from "@/components/ui/DateBlock";
+import PageHeader from "@/components/ui/PageHeader";
+import Progress from "@/components/ui/Progress";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import api, { errorMessage, getList } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
+import { participantCount } from "./data";
+import useResource from "@/hooks/useResource";
 
-const ManageDonation = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+// There is no fixed target on the backend, so the bar reflects momentum
+// toward a soft milestone rather than a real goal.
+const MILESTONE_STEP = 10000;
 
-  const token = getToken();
-
-  // Fetch Coordinator Events
-  const fetchEvents = async () => {
-    try {
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/my-events`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setEvents(res.data.events);
-      setLoading(false);
-    } catch (err) {
-      toast.error("Failed to fetch events");
-      setLoading(false);
-    }
-  };
-
-  // Toggle donation open/close
-  const toggleDonation = async (eventId) => {
-    try {
-      await axios.put(
-        `${API_URL}/api/coordinator/toggle-donation/${eventId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success("Donation status updated");
-      fetchEvents();
-    } catch (err) {
-      toast.error("Failed to toggle donation");
-    }
-  };
-
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="p-6 text-gray-700 text-center animate-pulse">
-        Loading events...
-      </div>
-    );
-  }
+function DonationCard({ event, busy, onToggle }) {
+  const collected = Number(event.totalCollected) || 0;
+  const milestone = Math.max(MILESTONE_STEP, Math.ceil((collected + 1) / MILESTONE_STEP) * MILESTONE_STEP);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto">
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-green-700">
-            💰 Manage Donations
-          </h2>
-
-          <button
-            onClick={fetchEvents}
-            className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm sm:text-base"
-          >
-            <FiRefreshCcw /> Refresh
-          </button>
-        </div>
-
-        {/* Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {events.length > 0 ? (
-            events.map((e) => (
-              <motion.div
-                key={e._id}
-                whileHover={{ scale: 1.03 }}
-                className="
-                  bg-white/80 backdrop-blur-lg shadow-lg rounded-2xl 
-                  p-4 sm:p-5 border border-green-100 hover:shadow-xl transition
-                "
-              >
-                {/* Title */}
-                <h3 className="text-lg sm:text-xl font-bold text-green-700 mb-2">
-                  {e.title}
-                </h3>
-
-                {/* Description */}
-                <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                  {e.description}
-                </p>
-
-                {/* Date */}
-                <div className="flex items-center gap-2 text-gray-700 mb-2 text-sm">
-                  <FiCalendar className="text-green-600" />
-                  <span>{new Date(e.date).toLocaleDateString()}</span>
-                </div>
-
-                {/* Location */}
-                <div className="flex items-center gap-2 text-gray-700 mb-2 text-sm">
-                  <FiMapPin className="text-green-600" />
-                  <span>{e.location}</span>
-                </div>
-
-                {/* Hours */}
-                <div className="flex items-center gap-2 text-gray-700 mb-2 text-sm">
-                  <FiClock className="text-green-600" />
-                  <span>{e.hours} hrs</span>
-                </div>
-
-                {/* Donation Status */}
-                <div className="mt-3 bg-green-100 text-green-700 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold">
-                  Donation Open: {e.donationOpen ? "YES" : "NO"}
-                </div>
-
-                {/* Total Collected */}
-                <div className="mt-2 bg-green-50 text-green-700 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold">
-                  Total Collected: ₹{e.totalCollected}
-                </div>
-
-                {/* Toggle Button */}
-                <button
-                  onClick={() => toggleDonation(e._id)}
-                  className={`
-                    mt-4 w-full px-4 py-2 text-white rounded-lg font-semibold 
-                    text-sm sm:text-base transition
-                    ${
-                      e.donationOpen
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-green-600 hover:bg-green-700"
-                    }
-                  `}
-                >
-                  {e.donationOpen ? "Close Donation" : "Open Donation"}
-                </button>
-              </motion.div>
-            ))
-          ) : (
-            <p className="text-center col-span-full text-gray-500 italic">
-              No events found.
-            </p>
-          )}
+    <article className="flex flex-col overflow-hidden rounded-xl border border-line bg-paper">
+      <div className="flex items-start gap-3 p-5">
+        <DateBlock date={event.date} size="sm" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-[15px] font-semibold text-fg">{event.title}</p>
+            <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+          </div>
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted">
+            {event.location ? (
+              <span className="flex items-center gap-1">
+                <MapPin aria-hidden="true" className="size-3.5" /> {event.location}
+              </span>
+            ) : null}
+            <span className="flex items-center gap-1">
+              <Users aria-hidden="true" className="size-3.5" /> {participantCount(event)} volunteers
+            </span>
+          </p>
         </div>
       </div>
-    </div>
+      <div className="mt-auto space-y-4 border-t border-line bg-canvas p-5">
+        <div>
+          <p className="tabular text-2xl font-semibold tracking-[-0.03em] text-fg">{formatCurrency(collected)}</p>
+          <Progress value={collected} max={milestone} size="sm" valueLabel={`toward ${formatCurrency(milestone)}`} className="mt-2" />
+        </div>
+        <Button
+          fullWidth
+          variant={event.donationOpen ? "danger-soft" : "primary"}
+          icon={event.donationOpen ? Lock : Unlock}
+          loading={busy}
+          onClick={() => onToggle(event)}
+        >
+          {event.donationOpen ? "Close donations" : "Open donations"}
+        </Button>
+      </div>
+    </article>
   );
-};
+}
 
-export default ManageDonation;
+export default function ManageDonation() {
+  const events = useResource(() => getList("/api/coordinator/my-events", "events"), []);
+  const [busyId, setBusyId] = useState(null);
+
+  const rows = useMemo(() => {
+    const list = events.data || [];
+    return [...list].sort((a, b) => (b.donationOpen === a.donationOpen ? (Number(b.totalCollected) || 0) - (Number(a.totalCollected) || 0) : b.donationOpen ? 1 : -1));
+  }, [events.data]);
+
+  const toggle = async (event) => {
+    setBusyId(event._id);
+    try {
+      const res = await api.put(`/api/coordinator/toggle-donation/${event._id}`, {});
+      const donationOpen = res.data?.message?.includes("OPEN") ?? !event.donationOpen;
+      events.mutate((list) => (list || []).map((e) => (e._id === event._id ? { ...e, donationOpen } : e)));
+      toast.success(donationOpen ? `Donations are open for ${event.title}.` : `Donations are closed for ${event.title}.`);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't change that setting."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const totalRaised = rows.reduce((sum, e) => sum + (Number(e.totalCollected) || 0), 0);
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Giving"
+        title="Donations"
+        description="Alumni can support any event where donations are open. Toggle it per event — closing it stops new gifts, not what's already given."
+        meta={totalRaised ? <span className="tabular font-semibold text-fg">{formatCurrency(totalRaised)} raised across your events</span> : null}
+      />
+
+      {events.loading ? (
+        <CardGridSkeleton count={4} />
+      ) : events.status === "error" ? (
+        <ErrorState error={events.error} onRetry={events.reload} />
+      ) : rows.length ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((event) => (
+            <DonationCard key={event._id} event={event} busy={busyId === event._id} onToggle={toggle} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={HandCoins} title="No events yet" description="Once you create an event, you can open it to alumni donations here." />
+      )}
+    </>
+  );
+}

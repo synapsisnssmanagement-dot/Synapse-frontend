@@ -1,248 +1,219 @@
 "use client";
 
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FaGoogle } from "react-icons/fa";
-import { IoArrowBack } from "react-icons/io5";
-import axios from "axios";
+import { useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "next/navigation";
+import { AlertCircle, Mail } from "lucide-react";
 import { toast } from "react-toastify";
+import Button from "@/components/ui/Button";
+import { Input, PasswordInput } from "@/components/ui/Field";
+import { Accent } from "@/components/ui/PageHeader";
+import api, { errorMessage } from "@/lib/api";
+import { API_URL } from "@/utils/config";
+import cx from "@/lib/cx";
+import AuthLayout from "../auth/AuthLayout";
 
-const Login = () => {
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const searchParams = useSearchParams();
-  const navigate = useRouter();
+// One request per attempt: the backend's login rate limit is shared across every
+// role's endpoint, so probing all five would lock out legitimate users.
+const ROLES = [
+  { id: "student", label: "Student", endpoint: "/api/students/studentlogin", home: "/studentlayout/dashboard", key: "student" },
+  { id: "teacher", label: "Teacher", endpoint: "/api/teacher/login", home: "/teacherLayout", key: "teacher" },
+  { id: "coordinator", label: "Coordinator", endpoint: "/api/coordinator/logincoordinator", home: "/coordinatorlayout", key: "coordinator" },
+  { id: "alumni", label: "Alumni", endpoint: "/api/alumni/login", home: "/alumnilayout/dashboard", key: "alumni" },
+  { id: "admin", label: "Admin", endpoint: "/api/admin/login", home: "/adminpanel", key: "admin" },
+];
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-
-    const loginEndpoints = [
-      { role: "admin", url: `${API_URL}/api/admin/login` },
-      { role: "coordinator", url: `${API_URL}/api/coordinator/logincoordinator` },
-      { role: "student", url: `${API_URL}/api/students/studentlogin` },
-      { role: "teacher", url: `${API_URL}/api/teacher/login` },
-      { role: "alumni", url: `${API_URL}/api/alumni/login` },
-    ];
-
-    let loggedIn = false;
-
-    for (const { role, url } of loginEndpoints) {
-      try {
-        const res = await axios.post(url, form, {
-          headers: { "Content-Type": "application/json" },
-        });
-
-        const { success, token } = res.data;
-
-        if (success && token) {
-          const userEmail =
-            res.data?.email ||
-            res.data?.user?.email ||
-            res.data?.teacher?.email ||
-            res.data?.student?.email ||
-            res.data?.coordinator?.email ||
-            res.data?.alumni?.email ||
-            res.data?.admin?.email ||
-            form.email;
-
-          localStorage.setItem("token", token);
-          localStorage.setItem("role", role);
-          localStorage.setItem("email", userEmail);
-
-          toast.success(`${role.toUpperCase()} login successful ✅`);
-          loggedIn = true;
-
-          setTimeout(() => {
-            if (role === "admin") window.location.href = "/adminpanel";
-            else if (role === "coordinator") window.location.href = "/coordinatorlayout";
-            else if (role === "teacher") window.location.href = "/teacherLayout";
-            else if (role === "student") window.location.href = "/studentlayout";
-            else if (role === "alumni") window.location.href = "/alumnilayout";
-          }, 1000);
-
-          break;
-        }
-      } catch (error) {
-        console.log(`${role} login failed`, error.response?.data || error);
-      }
-    }
-
-    if (!loggedIn) {
-      setMessage("Invalid credentials or account not found ❌");
-    }
-
-    setLoading(false);
-  };
-
-  const handleGoogleLogin = () => {
-    window.location.href = `${API_URL}/api/auth/google`;
-  };
-
-  useEffect(() => {
-    const error = searchParams.get("error");
-    if (error) setMessage(error);
-  }, [searchParams]);
-
-  return (
-    <div className="flex min-h-screen relative">
-
-      {/* 🔙 BACK BUTTON */}
-      <button
-        onClick={() => navigate.push("/")}
-        className="absolute top-6 left-6 z-50 flex items-center gap-2 bg-white/80 backdrop-blur-xl px-4 py-2 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 text-green-700 font-medium border border-green-200"
-      >
-        <IoArrowBack size={18} />
-        Home
-      </button>
-
-      {/* LEFT PANEL */}
-      <div className="hidden md:flex w-1/2 relative items-center justify-center overflow-hidden">
-        <video
-          src="/video/Login.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/60 via-emerald-800/40 to-transparent"></div>
-        <div className="absolute bottom-10 left-10 text-white space-y-4">
-          <h1 className="text-4xl font-extrabold drop-shadow-xl">
-            Welcome to{" "}
-            <span className="text-lime-300">Synapsis NSS Portal</span>
-          </h1>
-          <p className="text-gray-200 text-sm max-w-xs">
-            “Empowering students to serve with purpose and make a difference.”
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT PANEL */}
-      <div className="flex w-full md:w-1/2 justify-center items-center bg-gradient-to-br from-white/80 to-emerald-50 backdrop-blur-md relative overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-green-300 rounded-full blur-3xl opacity-30"></div>
-        <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-emerald-300 rounded-full blur-3xl opacity-30"></div>
-
-        <div className="relative bg-white/90 backdrop-blur-xl shadow-2xl rounded-3xl w-[90%] max-w-sm p-8 border border-green-100 transition-all duration-300 hover:scale-[1.02]">
-          <h2 className="text-3xl font-extrabold text-center text-green-800 mb-2">
-            Welcome Back 👋
-          </h2>
-          <p className="text-center text-gray-600 mb-6 text-sm">
-            Sign in to continue your journey with <b>Synapsis</b>
-          </p>
-
-          {message && (
-            <div
-              className={`text-center mb-4 py-2 rounded-xl font-medium text-sm ${
-                message.includes("successful")
-                  ? "bg-green-50 text-green-700"
-                  : "bg-red-50 text-red-600"
-              }`}
-            >
-              {message}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Email Address
-              </label>
-              <input
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-emerald-200 focus:border-green-400 bg-white transition text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-emerald-200 focus:border-green-400 bg-white transition text-sm"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2.5 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition duration-300 shadow-lg hover:shadow-emerald-200 text-sm flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <svg
-                  className="w-5 h-5 animate-spin text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  ></path>
-                </svg>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </form>
-
-          <div className="flex items-center my-4">
-            <hr className="flex-grow border-gray-300" />
-            <span className="px-3 text-xs text-gray-400 uppercase tracking-wider">
-              or
-            </span>
-            <hr className="flex-grow border-gray-300" />
-          </div>
-
-          <button
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 py-2.5 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition duration-300 shadow-sm hover:shadow-md text-sm"
-          >
-            <FaGoogle className="text-green-500 text-base" />
-            Continue with Google
-          </button>
-
-          <p className="text-center text-xs text-gray-500 mt-6">
-            Don’t have an account?{" "}
-            <Link
-              href={"/signup/student"}
-              className="text-green-700 font-semibold hover:underline"
-            >
-              Sign Up
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+const LAST_ROLE_KEY = "synapsis.lastRole";
+const OAUTH_ERRORS = {
+  notregistered: "There is no Synapsis account for that Google address. Sign up first, then use Google to sign in.",
+  invalidrole: "We couldn't work out which workspace to open. Please sign in with your email instead.",
 };
 
-export default Login;
+const noSubscribe = () => () => {};
+function readLastRole() {
+  try {
+    return window.localStorage.getItem(LAST_ROLE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4">
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z" />
+      <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z" />
+      <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.8 3.6-4.9 6.7-4.9z" />
+    </svg>
+  );
+}
+
+export default function Login() {
+  const searchParams = useSearchParams();
+  // Server renders the default; the remembered role applies after hydration without a mismatch.
+  const storedRole = useSyncExternalStore(noSubscribe, readLastRole, () => null);
+  const [chosenRole, setRole] = useState(null);
+  const role = chosenRole || (ROLES.some((r) => r.id === storedRole) ? storedRole : "student");
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const oauthError = searchParams.get("error");
+  const bannerMessage = error || (oauthError ? OAUTH_ERRORS[oauthError.toLowerCase()] || oauthError : "");
+
+  const current = ROLES.find((r) => r.id === role);
+
+  const update = (event) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
+    if (error) setError("");
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.post(current.endpoint, { email: form.email.trim(), password: form.password });
+      const { success, token } = res.data || {};
+      if (!success || !token) throw new Error("missing token");
+
+      const account = res.data[current.key] || res.data.user || {};
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", current.id);
+      localStorage.setItem("email", account.email || res.data.email || form.email.trim());
+      const name = account.name || res.data.name;
+      if (name) localStorage.setItem("name", name);
+      else localStorage.removeItem("name");
+      try {
+        localStorage.setItem(LAST_ROLE_KEY, current.id);
+      } catch {
+        // Preference only.
+      }
+
+      toast.success("Signed in. Opening your workspace.");
+      // Full reload so the socket connection picks up the new session.
+      window.location.assign(current.home);
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 404) setError(`We couldn't find a ${current.label.toLowerCase()} account with that email. Check the role above, or create an account.`);
+      else if (status === 400) setError("That email and password don't match. Please try again.");
+      else setError(errorMessage(err, "We couldn't sign you in. Please try again."));
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      image="/Images/IMG4.png"
+      imageAlt="A volunteer smiling from a donor chair at an NSS blood donation drive"
+      eyebrow="Welcome back"
+      statement={
+        <>
+          Pick up where your unit <Accent className="text-brand">left off.</Accent>
+        </>
+      }
+      caption="Events, hours, mentors and messages — all waiting in your workspace."
+    >
+      <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.035em] text-ink">Sign in to Synapsis</h1>
+      <p className="mt-2 text-[15px] text-muted">Choose your role, then use the email you registered with.</p>
+
+      <fieldset className="mt-8">
+        <legend className="mb-2 text-[13px] font-semibold text-fg">Sign in as</legend>
+        <div className="grid grid-cols-3 gap-1 rounded-lg border border-line bg-canvas p-1 sm:grid-cols-5">
+          {ROLES.map((item) => (
+            <label
+              key={item.id}
+              className={cx(
+                "relative flex h-9 cursor-pointer items-center justify-center rounded-md text-[13px] font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-brand-600",
+                role === item.id ? "bg-ink text-white shadow-subtle" : "text-fg-2 hover:bg-paper hover:text-ink"
+              )}
+            >
+              <input
+                type="radio"
+                name="role"
+                value={item.id}
+                checked={role === item.id}
+                onChange={() => {
+                  setRole(item.id);
+                  setError("");
+                }}
+                className="sr-only"
+              />
+              {item.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {bannerMessage ? (
+        <div role="alert" className="mt-6 flex gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] leading-snug text-red-800">
+          <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>{bannerMessage}</span>
+        </div>
+      ) : null}
+
+      <form onSubmit={submit} className="mt-6 space-y-5" noValidate={false}>
+        <Input
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          leading={Mail}
+          placeholder="you@college.edu"
+          value={form.email}
+          onChange={update}
+          required
+        />
+        <PasswordInput
+          label="Password"
+          name="password"
+          autoComplete="current-password"
+          placeholder="Your password"
+          value={form.password}
+          onChange={update}
+          required
+        />
+        <Button type="submit" size="lg" fullWidth loading={loading}>
+          {loading ? "Signing in" : `Sign in as ${current.label.toLowerCase()}`}
+        </Button>
+      </form>
+
+      <div className="my-7 flex items-center gap-4">
+        <span className="h-px flex-1 bg-line" />
+        <span className="eyebrow text-[0.62rem] text-subtle">or</span>
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <a
+        href={`${API_URL}/api/auth/google`}
+        className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-line-strong bg-paper text-sm font-semibold text-fg transition-colors hover:border-fg hover:bg-canvas"
+      >
+        <GoogleMark />
+        Continue with Google
+      </a>
+      <p className="mt-3 text-center text-[12.5px] text-muted">Google sign-in works for accounts that already exist.</p>
+
+      <div className="mt-10 border-t border-line pt-6 text-[14px] text-fg-2">
+        New to Synapsis?{" "}
+        <span className="text-muted">Join as a </span>
+        <Link href="/signup/student" className="link-draw font-semibold text-ink">
+          student
+        </Link>
+        <span className="text-muted">, </span>
+        <Link href="/signup/teacher" className="link-draw font-semibold text-ink">
+          teacher
+        </Link>
+        <span className="text-muted">, </span>
+        <Link href="/signup/coordinator" className="link-draw font-semibold text-ink">
+          coordinator
+        </Link>
+        <span className="text-muted"> or </span>
+        <Link href="/signup/alumni" className="link-draw font-semibold text-ink">
+          alumni
+        </Link>
+        .
+      </div>
+    </AuthLayout>
+  );
+}

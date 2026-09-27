@@ -1,54 +1,44 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { LogoMark } from "@/components/brand/Logo";
+import Spinner from "@/components/ui/Spinner";
 
-const OAuthSuccess = () => {
-  const navigate = useRouter();
-  const [loading, setLoading] = useState(true);
+const DESTINATIONS = {
+  admin: "/adminpanel",
+  superadmin: "/adminpanel",
+  coordinator: "/coordinatorlayout",
+  teacher: "/teacherLayout",
+  student: "/studentlayout/dashboard",
+  volunteer: "/studentlayout/dashboard",
+  alumni: "/alumnilayout/dashboard",
+};
 
+export default function OAuthSuccess() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     const role = params.get("role");
 
-    if (token && role) {
-      // ✅ Save credentials in localStorage
+    // Full reloads, not router.push: SocketProvider reads the token once on
+    // mount, so it must re-mount to pick up the session stored here.
+    if (token && role && DESTINATIONS[role]) {
       localStorage.setItem("token", token);
       localStorage.setItem("role", role);
-
-      const destinations = {
-        admin: "/adminpanel",
-        superadmin: "/adminpanel",
-        coordinator: "/coordinatorlayout",
-        teacher: "/teacherLayout",
-        student: "/studentlayout",
-        volunteer: "/studentlayout",
-        alumni: "/alumnilayout",
-      };
-
-      // Full reload, not router.push: SocketProvider reads the token once on mount,
-      // so it must re-mount to pick up the token we just stored.
-      window.location.href = destinations[role] || "/login?error=invalidrole";
+      window.location.replace(DESTINATIONS[role]);
     } else {
-      navigate.push("/login");
+      window.location.replace(token ? "/login?error=invalidrole" : "/login");
     }
-
-    setLoading(false);
-  }, [navigate]);
+  }, []);
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 text-gray-800">
-      <div className="p-6 bg-white shadow-lg rounded-2xl text-center">
-        <h2 className="text-2xl font-semibold mb-2">
-          {loading ? "Logging you in..." : "Redirecting..."}
-        </h2>
-        <p className="text-sm text-gray-500">
-          Please wait while we complete your Google authentication.
-        </p>
+    <main id="main" className="flex min-h-dvh flex-col items-center justify-center bg-ink px-6 text-center text-white">
+      <LogoMark className="size-12 text-white" />
+      <div role="status" className="mt-8 flex items-center gap-3 text-[15px] font-medium text-on-dark/80">
+        <Spinner className="size-4 text-brand" />
+        Signing you in with Google
       </div>
-    </div>
+      <p className="mt-3 max-w-xs text-[13.5px] text-on-dark/50">Opening your workspace in a moment.</p>
+    </main>
   );
-};
-
-export default OAuthSuccess;
+}

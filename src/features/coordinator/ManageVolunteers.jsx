@@ -1,276 +1,192 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useMemo, useState } from "react";
+import { CalendarRange, UserMinus, UserPlus, Users } from "lucide-react";
 import { toast } from "react-toastify";
-import { motion } from "framer-motion";
-import {
-  FiUserPlus,
-  FiUserMinus,
-  FiUsers,
-  FiCalendar,
-} from "react-icons/fi";
+import Avatar from "@/components/ui/Avatar";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import { Select } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { CardGridSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage, getList } from "@/lib/api";
+import cx from "@/lib/cx";
+import { formatDate } from "@/lib/format";
+import { sortEvents } from "./data";
 
-const ManageVolunteers = () => {
-  const [volunteers, setVolunteers] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [selectedVolunteers, setSelectedVolunteers] = useState([]);
-  const [assignedVolunteers, setAssignedVolunteers] = useState([]);
-  const [loading, setLoading] = useState(false);
+function VolunteerCard({ person, selected, onToggle, trailing }) {
+  return (
+    <label
+      className={cx(
+        "flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition-colors",
+        selected ? "border-ink bg-canvas" : "border-line bg-paper hover:border-line-strong"
+      )}
+    >
+      <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 size-4 accent-brand-700" />
+      <Avatar name={person.name} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] font-semibold text-fg">{person.name}</span>
+        <span className="block truncate text-[12.5px] text-muted">{person.department || person.email}</span>
+      </span>
+      {trailing}
+    </label>
+  );
+}
 
-  const token = getToken();
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
+export default function ManageVolunteers() {
+  const volunteers = useResource(() => getList("/api/coordinator/volunteers", "volunteers"), []);
+  const events = useResource(() => getList("/api/coordinator/my-events", "events"), []);
+  const [eventId, setEventId] = useState("");
+  const assigned = useResource(() => (eventId ? api.get(`/api/coordinator/events/${eventId}`).then((res) => res.data?.event?.participants || []) : Promise.resolve([])), [eventId], {
+    enabled: Boolean(eventId),
+  });
 
-  // Fetch volunteers
-  const fetchVolunteers = async () => {
+  const [query, setQuery] = useState("");
+  const [addPicked, setAddPicked] = useState([]);
+  const [removePicked, setRemovePicked] = useState([]);
+  const [busy, setBusy] = useState(null);
+
+
+  const active = useMemo(() => sortEvents((events.data || []).filter((e) => e.status !== "Completed" && e.status !== "Cancelled")), [events.data]);
+  const selectedEvent = active.find((e) => e._id === eventId);
+  const assignedList = assigned.data || [];
+  const assignedIds = new Set(assignedList.map((p) => String(p._id)));
+
+  const q = query.trim().toLowerCase();
+  const unassignedPool = (volunteers.data || []).filter((v) => !assignedIds.has(String(v._id)) && (!q || `${v.name} ${v.department}`.toLowerCase().includes(q)));
+  const assignedPool = assignedList.filter((v) => !q || `${v.name} ${v.department || ""}`.toLowerCase().includes(q));
+
+  const toggle = (setter) => (id) => setter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const assign = async () => {
+    setBusy("assign");
     try {
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/volunteers`,
-        axiosConfig
-      );
-      setVolunteers(res.data.volunteers || []);
+      await api.post("/api/coordinator/assignvolunteertoevents", { eventId, volunteerIds: addPicked });
+      const added = (volunteers.data || []).filter((v) => addPicked.includes(v._id));
+      assigned.mutate((list) => [...(list || []), ...added]);
+      toast.success(`${added.length} ${added.length === 1 ? "volunteer" : "volunteers"} assigned to ${selectedEvent.title}.`);
+      setAddPicked([]);
     } catch (error) {
-      toast.error("Failed to fetch volunteers");
-    }
-  };
-
-  // Fetch events
-  const fetchEvents = async () => {
-    try {
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/my-events`,
-        axiosConfig
-      );
-      setEvents(res.data.events || []);
-    } catch (error) {
-      toast.error("Failed to fetch events");
-    }
-  };
-
-  const fetchAssignedVolunteers = async (eventId) => {
-    if (!eventId) return;
-    try {
-      const res = await axios.get(
-        `${API_URL}/api/coordinator/events/${eventId}`,
-        axiosConfig
-      );
-      setAssignedVolunteers(res.data?.event?.participants || []);
-    } catch (error) {
-      setAssignedVolunteers([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchVolunteers();
-    fetchEvents();
-  }, []);
-
-  useEffect(() => {
-    fetchAssignedVolunteers(selectedEvent);
-    setSelectedVolunteers([]);
-  }, [selectedEvent]);
-
-  const handleVolunteerSelection = (id) => {
-    setSelectedVolunteers((prev) =>
-      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
-    );
-  };
-
-  // Assign Volunteers
-  const handleAssign = async () => {
-    if (!selectedEvent || selectedVolunteers.length === 0) {
-      toast.warning("Select an event and at least one volunteer");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await axios.post(
-        `${API_URL}/api/coordinator/assignvolunteertoevents`,
-        { eventId: selectedEvent, volunteerIds: selectedVolunteers },
-        axiosConfig
-      );
-      toast.success("Volunteers assigned successfully!");
-      setSelectedVolunteers([]);
-      fetchAssignedVolunteers(selectedEvent);
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to assign volunteers");
+      toast.error(errorMessage(error, "We couldn't assign those volunteers."));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   };
 
-  // Unassign Volunteers
-  const handleUnassign = async () => {
-    if (!selectedEvent || selectedVolunteers.length === 0) {
-      toast.warning("Select an event and volunteers to unassign");
-      return;
-    }
-
+  const unassign = async () => {
+    setBusy("remove");
     try {
-      setLoading(true);
-      await axios.post(
-        `${API_URL}/api/coordinator/unassign-volunteers`,
-        { eventId: selectedEvent, volunteerIds: selectedVolunteers },
-        axiosConfig
-      );
-      toast.success("Volunteers unassigned successfully!");
-      setSelectedVolunteers([]);
-      fetchAssignedVolunteers(selectedEvent);
+      await api.post("/api/coordinator/unassign-volunteers", { eventId, volunteerIds: removePicked });
+      assigned.mutate((list) => (list || []).filter((v) => !removePicked.includes(v._id)));
+      toast.success(`${removePicked.length} ${removePicked.length === 1 ? "volunteer" : "volunteers"} removed from ${selectedEvent.title}.`);
+      setRemovePicked([]);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to unassign volunteers");
+      toast.error(errorMessage(error, "We couldn't remove those volunteers."));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 bg-green-50 min-h-screen">
-      {/* HEADER */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h2 className="text-2xl sm:text-3xl font-bold text-green-700 flex items-center gap-2">
-          <FiUsers className="text-green-600" /> Manage Volunteers
-        </h2>
-        <p className="text-gray-500 text-sm mt-1">
-          Assign or unassign volunteers to events easily.
-        </p>
-      </motion.div>
+    <>
+      <PageHeader eyebrow="People" title="Volunteers" description="Build the team for an event, or free up volunteers who can't make it." />
 
-      {/* ASSIGNMENT PANEL */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white shadow-md rounded-2xl border border-green-100 p-5 sm:p-6 mb-8"
-      >
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-5 flex items-center gap-2">
-          <FiCalendar className="text-green-600" /> Event Volunteer Management
-        </h3>
+      {events.status === "error" ? (
+        <ErrorState title="We couldn't load your events" error={events.error} onRetry={events.reload} />
+      ) : events.loading ? (
+        <Skeleton className="h-11 w-full max-w-md" />
+      ) : active.length ? (
+        <Select
+          label="Event"
+          className="max-w-md"
+          value={eventId}
+          onChange={(e) => {
+            setEventId(e.target.value);
+            setAddPicked([]);
+            setRemovePicked([]);
+          }}
+          placeholder="Choose an upcoming or live event"
+        >
+          {active.map((e) => (
+            <option key={e._id} value={e._id}>
+              {e.title} — {formatDate(e.date, "short")}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <EmptyState icon={CalendarRange} title="No upcoming events" description="Create an event first, then build its volunteer team here." />
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Select Event */}
-          <div>
-            <label className="text-sm font-medium text-gray-600 mb-1 block">
-              Select Event
-            </label>
-            <select
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value)}
-              className="w-full p-3 border rounded-lg focus:ring-2 text-sm sm:text-base focus:ring-green-500"
-            >
-              <option value="">Choose Event</option>
-              {events.map((e) => (
-                <option key={e._id} value={e._id}>
-                  {e.title}
-                </option>
-              ))}
-            </select>
+      {eventId ? (
+        <div className="mt-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[15px] font-semibold text-fg">{selectedEvent?.title}</p>
+              {selectedEvent ? <StatusBadge status={selectedEvent.status} label={selectedEvent.status === "Ongoing" ? "Live" : undefined} /> : null}
+            </div>
+            <SearchInput value={query} onChange={setQuery} placeholder="Search volunteers" className="w-full sm:w-64" />
           </div>
 
-          {/* Assign */}
-          <div className="flex items-end">
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              disabled={loading}
-              onClick={handleAssign}
-              className="w-full bg-green-600 text-white py-3 rounded-lg text-sm sm:text-base font-semibold hover:bg-green-700 transition flex justify-center items-center gap-2"
-            >
-              <FiUserPlus /> {loading ? "Assigning..." : "Assign"}
-            </motion.button>
-          </div>
+          {volunteers.status === "error" || assigned.status === "error" ? (
+            <ErrorState
+              title="We couldn't load volunteers"
+              error={volunteers.error || assigned.error}
+              onRetry={() => {
+                volunteers.reload();
+                assigned.reload();
+              }}
+            />
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Panel title="Available volunteers" description={`${unassignedPool.length} not yet on this event`}>
+                {volunteers.loading || assigned.loading ? (
+                  <CardGridSkeleton count={4} className="sm:grid-cols-1 xl:grid-cols-1" />
+                ) : unassignedPool.length ? (
+                  <div className="space-y-2">
+                    <ul data-lenis-prevent className="scrollbar-quiet max-h-96 space-y-2 overflow-y-auto">
+                      {unassignedPool.map((v) => (
+                        <li key={v._id}>
+                          <VolunteerCard person={v} selected={addPicked.includes(v._id)} onToggle={() => toggle(setAddPicked)(v._id)} />
+                        </li>
+                      ))}
+                    </ul>
+                    <Button fullWidth icon={UserPlus} disabled={!addPicked.length} loading={busy === "assign"} onClick={assign}>
+                      {addPicked.length ? `Assign ${addPicked.length} selected` : "Select volunteers to assign"}
+                    </Button>
+                  </div>
+                ) : (
+                  <EmptyState size="sm" icon={Users} title={q ? "No matches" : "Everyone is assigned"} description={q ? "Try a different name or department." : "Every active volunteer is already on this event."} />
+                )}
+              </Panel>
 
-          {/* Unassign */}
-          <div className="flex items-end">
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              disabled={loading}
-              onClick={handleUnassign}
-              className="w-full bg-red-600 text-white py-3 rounded-lg text-sm sm:text-base font-semibold hover:bg-red-700 transition flex justify-center items-center gap-2"
-            >
-              <FiUserMinus /> {loading ? "Processing..." : "Unassign"}
-            </motion.button>
-          </div>
+              <Panel title="On this event" description={`${assignedPool.length} assigned`}>
+                {assigned.loading ? (
+                  <CardGridSkeleton count={4} className="sm:grid-cols-1 xl:grid-cols-1" />
+                ) : assignedPool.length ? (
+                  <div className="space-y-2">
+                    <ul data-lenis-prevent className="scrollbar-quiet max-h-96 space-y-2 overflow-y-auto">
+                      {assignedPool.map((v) => (
+                        <li key={v._id}>
+                          <VolunteerCard person={v} selected={removePicked.includes(v._id)} onToggle={() => toggle(setRemovePicked)(v._id)} />
+                        </li>
+                      ))}
+                    </ul>
+                    <Button fullWidth variant="danger-soft" icon={UserMinus} disabled={!removePicked.length} loading={busy === "remove"} onClick={unassign}>
+                      {removePicked.length ? `Remove ${removePicked.length} selected` : "Select volunteers to remove"}
+                    </Button>
+                  </div>
+                ) : (
+                  <EmptyState size="sm" icon={Users} title="No volunteers yet" description="Assign volunteers from the list on the left." />
+                )}
+              </Panel>
+            </div>
+          )}
         </div>
-      </motion.div>
-
-      {/* VOLUNTEER TABLE */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white border shadow-md rounded-2xl p-4 sm:p-6"
-      >
-        <h3 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
-          <FiUsers className="text-green-600" /> Available Volunteers
-        </h3>
-
-        {volunteers.length === 0 ? (
-          <p className="text-gray-500 py-5 text-center">
-            No volunteers found in your institution.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg">
-            <table className="min-w-full text-xs sm:text-sm">
-              <thead>
-                <tr className="bg-green-100 text-green-800 text-xs sm:text-sm">
-                  <th className="px-4 sm:px-6 py-3 text-left">Select</th>
-                  <th className="px-4 sm:px-6 py-3 text-left">Name</th>
-                  <th className="px-4 sm:px-6 py-3 text-left hidden sm:table-cell">
-                    Email
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left">Department</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {volunteers.map((v, index) => {
-                  const alreadyAssigned = assignedVolunteers.some(
-                    (a) => a._id === v._id
-                  );
-
-                  return (
-                    <motion.tr
-                      key={v._id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.02 }}
-                      className={`border-b ${
-                        alreadyAssigned ? "bg-gray-100 opacity-60" : "hover:bg-green-50"
-                      }`}
-                    >
-                      <td className="px-4 sm:px-6 py-3">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 accent-green-600"
-                          disabled={alreadyAssigned}
-                          checked={selectedVolunteers.includes(v._id)}
-                          onChange={() => handleVolunteerSelection(v._id)}
-                        />
-                      </td>
-
-                      <td className="px-4 sm:px-6 py-3 font-medium">{v.name}</td>
-
-                      {/* Hide email completely on extra small screens */}
-                      <td className="px-4 sm:px-6 py-3 hidden sm:table-cell">
-                        {v.email}
-                      </td>
-
-                      <td className="px-4 sm:px-6 py-3">{v.department}</td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </motion.div>
-    </div>
+      ) : null}
+    </>
   );
-};
-
-export default ManageVolunteers;
+}
