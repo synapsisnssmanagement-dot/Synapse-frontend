@@ -1,202 +1,78 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { Award, Check, X } from "lucide-react";
 import { toast } from "react-toastify";
-import { motion } from "framer-motion";
-import { FaCheckCircle, FaTimesCircle, FaUserGraduate, FaClipboardList } from "react-icons/fa";
+import Avatar from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
 
-const ApproveGraceMark = () => {
-  const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default function ApproveGraceMark() {
+  const list = useResource(() => api.get("/api/teacher/pending-recommendations").then((res) => res.data?.data || []), []);
+  const [busy, setBusy] = useState(null);
 
-  const API_BASE = `${API_URL}/api`;
-
-  // ✅ Fetch pending recommendations
-  const fetchRecommendations = async () => {
+  const decide = async (item, approve) => {
+    setBusy(`${item.id}:${approve}`);
     try {
-      setLoading(true);
-      const token = getToken();
-      const res = await axios.get(`${API_BASE}/teacher/pending-recommendations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setRecommendations(res.data.data || []);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch pending recommendations");
+      await api.put("/api/teacher/approverecommendedgracemark", { studentId: item.id, approve });
+      list.mutate((current) => (current || []).filter((r) => r.id !== item.id));
+      toast.success(approve ? `Approved ${item.marks} marks for ${item.name}.` : `Rejected the recommendation for ${item.name}.`);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't record that decision."));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   };
 
-  useEffect(() => {
-    fetchRecommendations();
-  }, []);
-
-  // ✅ Approve or Reject Recommendation
-  const handleDecision = async (studentId, approve) => {
-    try {
-      setLoading(true);
-      const token = getToken();
-
-      await axios.put(
-        `${API_BASE}/teacher/approverecommendedgracemark`,
-        { studentId, approve },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success(approve ? "✅ Grace mark approved!" : "❌ Recommendation rejected!");
-      setRecommendations((prev) => prev.filter((r) => r.id !== studentId));
-    } catch (err) {
-      console.error(err);
-      toast.error("Action failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const rows = list.data || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 px-4 py-10 sm:px-6 lg:px-10">
-      <motion.h1
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-3xl sm:text-4xl font-bold text-green-800 text-center mb-10"
-      >
-        Approve Recommended Grace Marks
-      </motion.h1>
+    <>
+      <PageHeader eyebrow="Recognition" title="Review grace marks" description="Recommendations coordinators have made for your students, waiting on your decision." />
 
-      {loading && (
-        <p className="text-center text-gray-600 mb-4 animate-pulse">
-          Loading recommendations...
-        </p>
-      )}
-
-      {recommendations.length === 0 && !loading ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center text-gray-600 text-lg py-10"
-        >
-          No pending recommendations 🎉
-        </motion.div>
+      {list.loading ? (
+        <CardGridSkeleton count={4} className="xl:grid-cols-2" />
+      ) : list.status === "error" ? (
+        <ErrorState error={list.error} onRetry={list.reload} />
+      ) : rows.length ? (
+        <ul className="grid gap-4 xl:grid-cols-2">
+          {rows.map((item) => (
+            <li key={item.id} className="flex flex-col rounded-xl border border-line bg-paper p-5">
+              <div className="flex items-start gap-3">
+                <Avatar name={item.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-semibold text-fg">{item.name}</p>
+                  <p className="truncate text-[13px] text-muted">{item.department || item.email}</p>
+                </div>
+                <Badge tone="warning" icon={Award}>
+                  {item.marks} marks
+                </Badge>
+              </div>
+              <p className="mt-4 flex-1 text-[14.5px] leading-relaxed text-fg-2">&ldquo;{item.reason}&rdquo;</p>
+              <p className="mt-4 text-[12.5px] text-subtle">
+                Recommended by {item.recommendedBy}
+                {item.date ? ` · ${timeAgo(item.date)}` : ""}
+              </p>
+              <div className="mt-4 flex gap-2 border-t border-line pt-4">
+                <Button size="sm" variant="danger-soft" icon={X} loading={busy === `${item.id}:false`} onClick={() => decide(item, false)} className="flex-1">
+                  Reject
+                </Button>
+                <Button size="sm" icon={Check} loading={busy === `${item.id}:true`} onClick={() => decide(item, true)} className="flex-1">
+                  Approve
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 25 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="bg-white shadow-xl rounded-2xl p-4 sm:p-6 max-w-7xl mx-auto border border-green-100"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <FaClipboardList className="text-green-600 text-2xl" />
-            <h2 className="text-2xl font-semibold text-green-700">
-              Pending Grace Mark Requests
-            </h2>
-          </div>
-
-          {/* ✅ Table View for large screens */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full border border-gray-200 rounded-xl">
-              <thead>
-                <tr className="bg-green-100 text-green-800">
-                  <th className="px-4 py-3 text-left">Student Name</th>
-                  <th className="px-4 py-3 text-left">Email</th>
-                  <th className="px-4 py-3 text-center">Marks</th>
-                  <th className="px-4 py-3 text-left">Reason</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recommendations.map((r) => (
-                  <motion.tr
-                    key={r.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="border-t hover:bg-green-50 transition-all"
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-800 flex items-center gap-2">
-                      <FaUserGraduate className="text-green-600" />
-                      {r.name}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{r.email}</td>
-                    <td className="px-4 py-3 text-center font-semibold text-green-700">
-                      {r.marks}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{r.reason}</td>
-                    <td className="px-4 py-3 text-center space-x-2">
-                      <button
-                        onClick={() => handleDecision(r.id, true)}
-                        disabled={loading}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-md hover:shadow-lg transition disabled:opacity-50"
-                      >
-                        <FaCheckCircle className="inline mr-1" />
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleDecision(r.id, false)}
-                        disabled={loading}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-md hover:shadow-lg transition disabled:opacity-50"
-                      >
-                        <FaTimesCircle className="inline mr-1" />
-                        Reject
-                      </button>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ✅ Card View for mobile screens */}
-          <div className="md:hidden flex flex-col gap-4">
-            {recommendations.map((r) => (
-              <motion.div
-                key={r.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <FaUserGraduate className="text-green-600" />
-                  <h3 className="font-semibold text-gray-800">{r.name}</h3>
-                </div>
-                <p className="text-gray-600 text-sm mb-1">
-                  <span className="font-medium text-gray-700">Email:</span> {r.email}
-                </p>
-                <p className="text-gray-600 text-sm mb-1">
-                  <span className="font-medium text-gray-700">Marks:</span> {r.marks}
-                </p>
-                <p className="text-gray-600 text-sm mb-3">
-                  <span className="font-medium text-gray-700">Reason:</span> {r.reason}
-                </p>
-                <div className="flex justify-between mt-2">
-                  <button
-                    onClick={() => handleDecision(r.id, true)}
-                    disabled={loading}
-                    className="bg-green-600 hover:bg-green-700 text-white w-[48%] py-2 rounded-md text-sm font-medium shadow-md hover:shadow-lg transition disabled:opacity-50"
-                  >
-                    <FaCheckCircle className="inline mr-1" />
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleDecision(r.id, false)}
-                    disabled={loading}
-                    className="bg-red-600 hover:bg-red-700 text-white w-[48%] py-2 rounded-md text-sm font-medium shadow-md hover:shadow-lg transition disabled:opacity-50"
-                  >
-                    <FaTimesCircle className="inline mr-1" />
-                    Reject
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
+        <EmptyState icon={Award} title="Nothing to review" description="When a coordinator recommends a grace mark for one of your students, it will appear here." />
       )}
-    </div>
+    </>
   );
-};
-
-export default ApproveGraceMark;
+}

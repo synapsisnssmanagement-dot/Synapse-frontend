@@ -1,196 +1,124 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { Building2, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { toast } from "react-toastify";
+import Avatar from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { Input } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { ProfileSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
+import UploadZone from "@/components/ui/UploadZone";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import { photoOf } from "@/lib/format";
 
-const TeacherProfile = () => {
-  const [profile, setProfile] = useState(null);
-  const [formData, setFormData] = useState({});
-  const [imagePreview, setImagePreview] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [isChanged, setIsChanged] = useState(false);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // ✅ Fetch teacher profile
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = getToken();
-        const res = await axios.get(`${API_URL}/api/teacher/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setProfile(res.data.teacher);
-        setFormData(res.data.teacher);
-        setImagePreview(res.data.teacher.profileImage?.url || "");
-      } catch (error) {
-        console.error("Error fetching teacher profile:", error);
-      }
-    };
-    fetchProfile();
-  }, []);
+function ProfileForm({ teacher, onSaved }) {
+  const [values, setValues] = useState({
+    name: teacher.name || "",
+    email: teacher.email || "",
+    phoneNumber: teacher.phoneNumber || "",
+    department: teacher.department || "",
+  });
+  const [photo, setPhoto] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  // ✅ Handle input change
-  const handleChange = (e) => {
+  const update = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setIsChanged(true);
+    setValues((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  // ✅ Handle image change (preview + mark changed)
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setImagePreview(URL.createObjectURL(file));
-    setFormData((prev) => ({ ...prev, profileImage: file }));
-    setIsChanged(true);
-  };
+  const submit = async (e) => {
+    e.preventDefault();
+    const next = {};
+    if (values.name.trim().length < 2) next.name = "Enter your name.";
+    if (!EMAIL_RE.test(values.email.trim())) next.email = "Enter a valid email address.";
+    if (values.phoneNumber.replace(/\D/g, "").length < 10) next.phoneNumber = "Enter a phone number with at least 10 digits.";
+    if (!values.department.trim()) next.department = "Enter your department.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
 
-  // ✅ Submit updates
-  const handleSave = async () => {
-    setLoading(true);
+    setSaving(true);
+    const form = new FormData();
+    form.append("name", values.name.trim());
+    form.append("email", values.email.trim());
+    form.append("phoneNumber", values.phoneNumber.trim());
+    form.append("department", values.department.trim());
+    if (photo) form.append("profileImage", photo);
     try {
-      const token = getToken();
-      const form = new FormData();
-
-      // append updated data
-      for (const key in formData) {
-        form.append(key, formData[key]);
-      }
-
-      const res = await axios.put(
-        `${API_URL}/api/teacher/profile`,
-        form,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      setProfile(res.data.teacher);
-      setFormData(res.data.teacher);
-      setImagePreview(res.data.teacher.profileImage?.url || "");
-      setIsChanged(false);
-      alert("✅ Profile updated successfully!");
+      const res = await api.put("/api/teacher/profile", form);
+      toast.success("Profile saved.");
+      localStorage.setItem("name", values.name.trim());
+      localStorage.setItem("email", values.email.trim());
+      onSaved(res.data?.teacher || { ...teacher, ...values });
+      setPhoto(null);
     } catch (error) {
-      console.error("Error updating profile:", error);
-      alert("Failed to update profile!");
+      toast.error(errorMessage(error, "We couldn't save your profile."));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (!profile) {
-    return (
-      <div className="flex justify-center items-center h-screen text-green-700 font-semibold">
-        Loading profile...
+  return (
+    <form onSubmit={submit} noValidate className="space-y-6">
+      <Panel title="Photo">
+        <UploadZone shape="avatar" file={photo} onChange={setPhoto} hint="Shown to your institution's coordinators and students." />
+      </Panel>
+      <Panel title="Personal details">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Input label="Full name" name="name" leading={UserRound} value={values.name} onChange={update} error={errors.name} required />
+          <Input label="Email" name="email" type="email" leading={Mail} value={values.email} onChange={update} error={errors.email} required />
+          <Input label="Phone number" name="phoneNumber" type="tel" leading={Phone} value={values.phoneNumber} onChange={update} error={errors.phoneNumber} required />
+          <Input label="Department" name="department" leading={Building2} value={values.department} onChange={update} error={errors.department} required />
+        </div>
+      </Panel>
+      <div className="flex justify-end">
+        <Button type="submit" loading={saving}>
+          Save changes
+        </Button>
       </div>
-    );
-  }
+    </form>
+  );
+}
+
+export default function TeacherProfile() {
+  const profile = useResource(() => api.get("/api/teacher/profile").then((res) => res.data?.teacher || null), []);
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gray-50 py-10">
-      <div className="w-full max-w-3xl bg-white border-2 border-green-500 shadow-lg rounded-2xl p-8">
-        <h2 className="text-3xl font-bold text-green-700 mb-6 text-center">
-          Teacher Profile
-        </h2>
-
-        {/* Profile Image */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative group">
-            <img
-              src={imagePreview || "/default-avatar.png"}
-              alt="Profile"
-              className="w-32 h-32 object-cover rounded-full border-4 border-green-400 shadow-md"
-            />
-            <label
-              htmlFor="imageUpload"
-              className="absolute bottom-0 right-0 bg-green-600 text-white px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition cursor-pointer"
-            >
-              Change
-            </label>
-            <input
-              id="imageUpload"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-          </div>
+    <>
+      <PageHeader eyebrow="Account" title="Your profile" description="Keep your details current so your institution and students can reach you." />
+      {profile.loading ? (
+        <ProfileSkeleton />
+      ) : profile.status === "error" || !profile.data ? (
+        <ErrorState title="We couldn't load your profile" error={profile.error} onRetry={profile.reload} />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl bg-ink p-6 text-on-dark">
+            <Avatar src={photoOf(profile.data)} name={profile.data.name} size="xl" className="ring-4 ring-white/10" />
+            <p className="mt-5 text-xl font-semibold tracking-[-0.02em] text-white">{profile.data.name}</p>
+            <p className="mt-1 text-[13.5px] text-on-dark/60">{profile.data.email}</p>
+            <div className="mt-4">
+              <Badge tone={profile.data.status === "active" ? "live" : "warning"} icon={ShieldCheck}>
+                {profile.data.status === "active" ? "Teacher" : "Pending approval"}
+              </Badge>
+            </div>
+            <dl className="mt-6 space-y-3 border-t border-white/10 pt-5 text-[13.5px]">
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Department</dt>
+                <dd className="text-right text-white">{profile.data.department || "—"}</dd>
+              </div>
+            </dl>
+          </aside>
+          <ProfileForm key={profile.data.email} teacher={profile.data} onSaved={(next) => profile.mutate(next)} />
         </div>
-
-        {/* Profile Fields */}
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">
-              Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name || ""}
-              onChange={handleChange}
-              className="w-full p-3 border border-green-400 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email || ""}
-              disabled
-              className="w-full p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">
-              Phone Number
-            </label>
-            <input
-              type="text"
-              name="phoneNumber"
-              value={formData.phoneNumber || ""}
-              onChange={handleChange}
-              className="w-full p-3 border border-green-400 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">
-              Department
-            </label>
-            <input
-              type="text"
-              name="department"
-              value={formData.department || ""}
-              onChange={handleChange}
-              className="w-full p-3 border border-green-400 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 transition"
-            />
-          </div>
-        </div>
-
-        {/* Save Button */}
-        {isChanged && (
-          <div className="text-center mt-8">
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50"
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </>
   );
-};
-
-export default TeacherProfile;
+}

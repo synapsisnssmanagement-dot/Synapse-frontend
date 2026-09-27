@@ -1,227 +1,202 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useMemo, useState } from "react";
+import { CalendarDays, CalendarRange, Check, MapPin, Users, X } from "lucide-react";
 import { toast } from "react-toastify";
-import { motion, AnimatePresence } from "framer-motion";
-import { FaMapMarkerAlt, FaCalendarAlt, FaClipboardList } from "react-icons/fa";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import cx from "@/lib/cx";
+import { formatDate } from "@/lib/format";
+import { sortEvents, useMyEvents } from "./data";
 
-const AttendanceByTeacher = () => {
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [attendance, setAttendance] = useState({});
-  const [loading, setLoading] = useState(false);
+function EventPicker({ events, onSelect }) {
+  const eligible = sortEvents(events.filter((e) => e.status !== "Cancelled"));
+  if (!eligible.length) {
+    return <EmptyState icon={CalendarRange} title="No events assigned yet" description="Once a coordinator assigns you to an event, it appears here." />;
+  }
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {eligible.map((event) => (
+        <li key={event._id}>
+          <button
+            type="button"
+            onClick={() => onSelect(event)}
+            className="flex h-full w-full flex-col rounded-xl border border-line bg-paper p-5 text-left transition-colors hover:border-ink"
+          >
+            <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} className="self-start" />
+            <p className="mt-3 text-[16px] font-semibold text-fg">{event.title}</p>
+            <ul className="mt-3 space-y-1.5 text-[13px] text-muted">
+              <li className="flex items-center gap-2">
+                <CalendarDays aria-hidden="true" className="size-3.5" /> {formatDate(event.date)}
+              </li>
+              <li className="flex items-center gap-2">
+                <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
+              </li>
+            </ul>
+            <span className="mt-auto pt-4 text-[13px] font-semibold text-brand-700">Take attendance →</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-  const API_BASE = `${API_URL}/api`;
+function AttendanceSheet({ event, onClose }) {
+  const participants = useResource(
+    () => api.get(`/api/events/participantsofevents/${event._id}`).then((res) => res.data?.participants || []),
+    [event._id]
+  );
+  const [status, setStatus] = useState({});
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(null);
 
-  // ✅ Fetch events for logged-in teacher
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const token = getToken();
-        const res = await axios.get(`${API_BASE}/teacher/teachermyevents`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.data.success) setEvents(res.data.data || []);
-        else toast.error(res.data.message || "No events found");
-      } catch {
-        toast.error("Failed to load events");
-      }
-    };
-    fetchEvents();
-  }, []);
+  const people = participants.data || [];
+  const statusOf = (id) => status[id] || "Present";
+  const present = people.filter((s) => statusOf(s._id) === "Present").length;
 
-  // ✅ Select event and fetch volunteers
-  const handleSelectEvent = async (eventId) => {
-    setSelectedEvent(events.find((e) => e._id === eventId));
-    setLoading(true);
+  const q = query.trim().toLowerCase();
+  const visible = q ? people.filter((s) => `${s.name} ${s.department || ""}`.toLowerCase().includes(q)) : people;
+
+  const setOne = (id, value) => setStatus((prev) => ({ ...prev, [id]: value }));
+  const setAll = (value) => setStatus(Object.fromEntries(people.map((s) => [s._id, value])));
+
+  const submit = async () => {
+    setSaving(true);
     try {
-      const res = await axios.get(`${API_BASE}/events/participantsofevents/${eventId}`);
-      if (res.data.success) {
-        const participants = res.data.participants || [];
-        setStudents(participants);
-        const initialAttendance = {};
-        participants.forEach((s) => (initialAttendance[s._id] = "Present"));
-        setAttendance(initialAttendance);
-      } else toast.error("No volunteers found");
-    } catch {
-      toast.error("Error loading volunteers");
+      const attendanceList = people.map((s) => ({ studentId: s._id, status: statusOf(s._id) }));
+      await api.post(`/api/teacher/attendance/${event._id}`, { attendanceList });
+      toast.success(`Attendance saved for ${event.title}.`);
+      setSavedAt(new Date());
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't save attendance."));
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ Change attendance for each student
-  const handleAttendanceChange = (studentId, status) => {
-    setAttendance((prev) => ({ ...prev, [studentId]: status }));
-  };
-
-  // ✅ Submit attendance
-  const handleSubmit = async () => {
-    if (!selectedEvent) return toast.error("Select an event first");
-    try {
-      const token = getToken();
-      const attendanceList = Object.entries(attendance).map(([studentId, status]) => ({
-        studentId,
-        status,
-      }));
-      const res = await axios.post(
-        `${API_BASE}/teacher/attendance/${selectedEvent._id}`,
-        { attendanceList },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.data.success) toast.success("✅ Attendance submitted successfully!");
-      else toast.error(res.data.message);
-    } catch {
-      toast.error("Failed to mark attendance");
+      setSaving(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-8">
-      <h2 className="text-4xl font-bold text-center mb-10 text-green-800">
-        Event Attendance Portal
-      </h2>
+    <div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Button variant="ghost" size="sm" onClick={onClose} className="-ml-2 mb-2 text-muted">
+            ← All events
+          </Button>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-fg">{event.title}</h2>
+          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13.5px] text-muted">
+            <span className="flex items-center gap-1.5">
+              <CalendarDays aria-hidden="true" className="size-3.5" /> {formatDate(event.date)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
+            </span>
+          </p>
+        </div>
+        {people.length ? (
+          <div className="rounded-lg border border-line bg-canvas px-4 py-2.5 text-right">
+            <p className="tabular text-lg font-semibold text-fg">
+              {present} <span className="text-[13px] font-normal text-muted">/ {people.length} present</span>
+            </p>
+          </div>
+        ) : null}
+      </div>
 
-      {/* 🎯 Step 1: Select Event */}
-      <AnimatePresence>
-        {!selectedEvent && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6"
-          >
-            {events.length === 0 ? (
-              <p className="text-center col-span-full text-gray-600">
-                No events assigned yet.
-              </p>
-            ) : (
-              events.map((event) => (
-                <motion.div
-                  key={event._id}
-                  onClick={() => handleSelectEvent(event._id)}
-                  whileHover={{ scale: 1.05 }}
-                  className="cursor-pointer bg-white/80 backdrop-blur-md shadow-md border border-green-200 rounded-2xl p-5 hover:shadow-xl transition-all"
-                >
-                  <h3 className="text-xl font-semibold text-green-800 truncate">
-                    {event.title}
-                  </h3>
-                  <div className="text-gray-600 mt-2 space-y-1 text-sm">
-                    <p className="flex items-center gap-2">
-                      <FaCalendarAlt /> {new Date(event.date).toLocaleDateString()}
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <FaMapMarkerAlt /> {event.location}
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <FaClipboardList /> {event.status}
-                    </p>
-                  </div>
-                  <div className="mt-4 flex justify-center">
-                    <button className="bg-green-600 text-white px-4 py-1 rounded-lg hover:bg-green-700 transition">
-                      Select Event
+      {participants.loading ? (
+        <TableSkeleton rows={6} columns={3} />
+      ) : participants.status === "error" ? (
+        <ErrorState error={participants.error} onRetry={participants.reload} />
+      ) : people.length ? (
+        <div className="overflow-hidden rounded-xl border border-line bg-paper">
+          <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
+            <SearchInput value={query} onChange={setQuery} placeholder="Search volunteers" className="flex-1 sm:max-w-xs" />
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setAll("Present")}>
+                Mark all present
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAll("Absent")}>
+                Mark all absent
+              </Button>
+            </div>
+          </div>
+          <ul className="divide-y divide-line">
+            {visible.map((student) => {
+              const present2 = statusOf(student._id) === "Present";
+              return (
+                <li key={student._id} className="flex items-center gap-4 px-4 py-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14.5px] font-medium text-fg">{student.name}</span>
+                    <span className="block truncate text-[12.5px] text-muted">{student.department || student.email}</span>
+                  </span>
+                  <div role="group" aria-label={`Attendance for ${student.name}`} className="flex shrink-0 overflow-hidden rounded-lg border border-line">
+                    <button
+                      type="button"
+                      aria-pressed={present2}
+                      onClick={() => setOne(student._id, "Present")}
+                      className={cx(
+                        "flex h-9 items-center gap-1.5 px-3 text-[13px] font-semibold transition-colors",
+                        present2 ? "bg-brand text-ink" : "bg-paper text-muted hover:bg-canvas"
+                      )}
+                    >
+                      <Check aria-hidden="true" className="size-3.5" /> Present
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!present2}
+                      onClick={() => setOne(student._id, "Absent")}
+                      className={cx(
+                        "flex h-9 items-center gap-1.5 px-3 text-[13px] font-semibold transition-colors",
+                        !present2 ? "bg-red-600 text-white" : "bg-paper text-muted hover:bg-canvas"
+                      )}
+                    >
+                      <X aria-hidden="true" className="size-3.5" /> Absent
                     </button>
                   </div>
-                </motion.div>
-              ))
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <EmptyState icon={Users} title="No volunteers on this event" description="Attendance can be recorded once volunteers are assigned." />
+      )}
 
-      {/* 🎯 Step 2: Mark Attendance */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              className="bg-white w-full max-w-3xl rounded-2xl shadow-lg p-6 overflow-y-auto max-h-[85vh]"
-            >
-              <h3 className="text-2xl font-semibold mb-4 text-center text-green-700">
-                Mark Attendance - {selectedEvent.title}
-              </h3>
-
-              <div className="text-center mb-2 text-sm text-gray-500">
-                📅 {new Date(selectedEvent.date).toLocaleDateString()} • 📍{" "}
-                {selectedEvent.location}
-              </div>
-
-              {loading ? (
-                <p className="text-center text-gray-500 py-10">Loading volunteers...</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border border-gray-200 rounded-lg">
-                    <thead className="bg-green-100 text-green-800">
-                      <tr>
-                        <th className="p-2 border">#</th>
-                        <th className="p-2 border text-left">Name</th>
-                        <th className="p-2 border text-left hidden sm:table-cell">
-                          Department
-                        </th>
-                        <th className="p-2 border text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {students.map((s, i) => (
-                        <tr
-                          key={s._id}
-                          className="hover:bg-green-50 transition text-gray-700"
-                        >
-                          <td className="p-2 border text-center">{i + 1}</td>
-                          <td className="p-2 border">{s.name}</td>
-                          <td className="p-2 border hidden sm:table-cell">
-                            {s.department || "-"}
-                          </td>
-                          <td className="p-2 border text-center">
-                            <select
-                              value={attendance[s._id] || "Present"}
-                              onChange={(e) =>
-                                handleAttendanceChange(s._id, e.target.value)
-                              }
-                              className="border rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-green-400"
-                            >
-                              <option value="Present">✅ Present</option>
-                              <option value="Absent">❌ Absent</option>
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* ✅ Only Submit & Close buttons now */}
-              <div className="flex flex-wrap gap-3 mt-6 justify-center">
-                <button
-                  onClick={handleSubmit}
-                  className="bg-green-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-green-700 transition"
-                >
-                  ✅ Submit Attendance
-                </button>
-                <button
-                  onClick={() => setSelectedEvent(null)}
-                  className="bg-gray-300 text-gray-700 px-5 py-2 rounded-lg font-medium hover:bg-gray-400 transition"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {people.length ? (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[13px] text-muted">{savedAt ? `Saved at ${formatDate(savedAt, "time")}.` : "Everyone defaults to present — mark exceptions, then save."}</p>
+          <Button icon={Check} loading={saving} onClick={submit}>
+            Save attendance
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
-};
+}
 
-export default AttendanceByTeacher;
+export default function AttendanceByTeacher() {
+  const events = useMyEvents();
+  const [selected, setSelected] = useState(null);
+
+  const eligible = useMemo(() => sortEvents((events.data || []).filter((e) => e.status !== "Cancelled")), [events.data]);
+  const current = selected ? eligible.find((e) => e._id === selected._id) || selected : null;
+
+  return (
+    <>
+      <PageHeader eyebrow="Events" title="Attendance" description="Mark who showed up. Everyone starts present — flip the exceptions and save." />
+      {events.loading ? (
+        <CardGridSkeleton count={3} />
+      ) : events.status === "error" ? (
+        <ErrorState error={events.error} onRetry={events.reload} />
+      ) : current ? (
+        <AttendanceSheet event={current} onClose={() => setSelected(null)} />
+      ) : (
+        <EventPicker events={events.data || []} onSelect={setSelected} />
+      )}
+    </>
+  );
+}

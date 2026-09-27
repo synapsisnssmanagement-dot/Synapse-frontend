@@ -1,390 +1,255 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useId, useMemo, useState } from "react";
+import { CalendarDays, CalendarRange, ImagePlus, MapPin, Pencil, Users } from "lucide-react";
 import { toast } from "react-toastify";
-import {
-  CalendarDays,
-  MapPin,
-  Clock,
-  GraduationCap,
-  ImagePlus,
-  Pencil,
-} from "lucide-react";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import DateBlock from "@/components/ui/DateBlock";
+import { Drawer } from "@/components/ui/Dialog";
+import { Input, Select, Textarea } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
+import UploadZone from "@/components/ui/UploadZone";
+import api, { errorMessage } from "@/lib/api";
+import { formatDate } from "@/lib/format";
+import { sortEvents, useMyEvents } from "./data";
 
-const MyEventsTeacher = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "Upcoming", label: "Upcoming" },
+  { id: "Ongoing", label: "Live" },
+  { id: "Completed", label: "Completed" },
+];
 
-  // States for modals
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [editForm, setEditForm] = useState({
-    title: "",
-    description: "",
-    date: "",
-    location: "",
-    hours: "",
-    status: "",
-  });
-  const [images, setImages] = useState([]);
+function EditDrawer({ event, open, onClose, onSaved }) {
+  const [values, setValues] = useState(() => ({
+    title: event?.title || "",
+    description: event?.description || "",
+    location: event?.location || "",
+    date: event?.date ? String(event.date).slice(0, 10) : "",
+    hours: event?.hours ?? "",
+    status: event?.status || "Upcoming",
+  }));
+  const [saving, setSaving] = useState(false);
+  const update = (e) => setValues((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.put(`/api/teacher/${event._id}/edit`, values);
+      toast.success("Event updated.");
+      onSaved({ ...event, ...values, hours: Number(values.hours) || event.hours });
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't save the event."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      eyebrow="Edit event"
+      title={event?.title || ""}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" form="teacher-edit-event" loading={saving}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <form id="teacher-edit-event" onSubmit={save} className="space-y-5" noValidate>
+        <Input label="Event name" name="title" value={values.title} onChange={update} required />
+        <Textarea label="Description" name="description" rows={4} value={values.description} onChange={update} />
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Input label="Date" name="date" type="date" leading={CalendarDays} value={values.date} onChange={update} />
+          <Input label="Hours" name="hours" type="number" min={1} max={24} step="0.5" value={values.hours} onChange={update} />
+        </div>
+        <Input label="Location" name="location" leading={MapPin} value={values.location} onChange={update} />
+        <Select label="Status" name="status" value={values.status} onChange={update}>
+          <option value="Upcoming">Upcoming</option>
+          <option value="Ongoing">Ongoing</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+        </Select>
+      </form>
+    </Drawer>
+  );
+}
+
+function UploadDrawer({ event, open, onClose }) {
+  const [files, setFiles] = useState([]);
+  const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
+  const addFiles = (list) => setFiles((prev) => [...prev, ...Array.from(list)].slice(0, 10));
 
-  const fetchEvents = async () => {
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!files.length) {
+      toast.warn("Choose at least one photo.");
+      return;
+    }
+    setUploading(true);
+    const form = new FormData();
+    files.forEach((file) => form.append("images", file));
+    if (caption.trim()) form.append("caption", caption.trim());
     try {
-      const token = getToken();
-      const res = await axios.get(`${API_URL}/api/teacher/teachermyevents`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log(res.data)
-
-      if (res.data.success) {
-        setEvents(res.data.data);
-      } else {
-        toast.error(res.data.message || "Failed to fetch events");
-      }
+      await api.post(`/api/teacher/${event._id}/uploadimages`, form);
+      toast.success(`${files.length} ${files.length === 1 ? "photo" : "photos"} uploaded.`);
+      setFiles([]);
+      setCaption("");
+      onClose();
     } catch (error) {
-      console.error("Error fetching events:", error);
-      toast.error(error.response?.data?.message || "Server error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle edit click
-  const handleEditClick = (event) => {
-    setSelectedEvent(event);
-    setEditForm({
-      title: event.title,
-      description: event.description,
-      date: event.date.split("T")[0],
-      location: event.location,
-      hours: event.hours,
-      status: event.status,
-    });
-  };
-
-  // Handle edit submit
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const token = getToken();
-      const res = await axios.put(
-        `${API_URL}/api/teacher/${selectedEvent._id}/edit`,
-        editForm,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (res.data.success) {
-        toast.success("Event updated successfully");
-        setSelectedEvent(null);
-        fetchEvents();
-      }
-    } catch (err) {
-      console.error("Error updating event:", err);
-      toast.error(err.response?.data?.message || "Failed to update event");
-    }
-  };
-
-  // Handle image upload
-  const handleImageUpload = async (e) => {
-    e.preventDefault();
-    if (!images.length) return toast.warning("Please select images first");
-
-    const formData = new FormData();
-    images.forEach((img) => formData.append("images", img));
-
-    try {
-      setUploading(true);
-      const token = getToken();
-      const res = await axios.post(
-        `${API_URL}/api/teacher/${selectedEvent._id}/uploadimages`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      if (res.data.success) {
-        toast.success("Images uploaded successfully");
-        setImages([]);
-        setSelectedEvent(null);
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      toast.error(err.response?.data?.message || "Upload failed");
+      toast.error(errorMessage(error, "We couldn't upload those photos."));
     } finally {
       setUploading(false);
     }
   };
 
-  const filtered = events.filter((e) => {
-    if (filter === "all") return true;
-    return e.status?.toLowerCase() === filter.toLowerCase();
-  });
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      eyebrow="Memories"
+      title={`Add photos — ${event?.title || ""}`}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={uploading}>
+            Cancel
+          </Button>
+          <Button type="submit" form="teacher-upload-images" loading={uploading}>
+            Upload
+          </Button>
+        </>
+      }
+    >
+      <form id="teacher-upload-images" onSubmit={submit} className="space-y-5" noValidate>
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            addFiles(e.dataTransfer.files);
+          }}
+          className="rounded-xl border border-dashed border-line-strong bg-canvas p-6 text-center"
+        >
+          <ImagePlus aria-hidden="true" className="mx-auto size-6 text-muted" />
+          <p className="mt-3 text-[14px] font-semibold text-fg">
+            Drop photos here or{" "}
+            <label className="link-draw cursor-pointer text-brand-700">
+              browse
+              <input type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+            </label>
+          </p>
+          <p className="mt-1 text-[12.5px] text-muted">Up to 10 photos, for the public gallery.</p>
+        </div>
+        {files.length ? (
+          <ul className="grid grid-cols-4 gap-2">
+            {files.map((file, i) => (
+              <li key={i} className="relative aspect-square overflow-hidden rounded-lg bg-mist">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local file preview */}
+                <img src={URL.createObjectURL(file)} alt="" className="size-full object-cover" />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <Input label="Caption" hint="Applied to all photos in this batch." value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="What does this show?" />
+      </form>
+    </Drawer>
+  );
+}
 
-  if (loading)
-    return (
-      <div className="flex justify-center items-center h-screen text-gray-500">
-        Loading events...
-      </div>
-    );
+export default function MyEventsTeacher() {
+  const events = useMyEvents();
+  const tabsId = useId();
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [uploading, setUploading] = useState(null);
+
+  const all = useMemo(() => events.data || [], [events.data]);
+  const counts = useMemo(() => {
+    const out = { all: all.length, Upcoming: 0, Ongoing: 0, Completed: 0 };
+    all.forEach((e) => {
+      if (out[e.status] != null) out[e.status] += 1;
+    });
+    return out;
+  }, [all]);
+
+  const q = query.trim().toLowerCase();
+  const rows = sortEvents(all.filter((e) => (filter === "all" || e.status === filter) && (!q || e.title.toLowerCase().includes(q))));
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen transition-all duration-300">
-      {/* Header */}
-      <div className="flex flex-wrap justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">
-          My Assigned Events
-        </h2>
+    <>
+      <PageHeader eyebrow="Events" title="My events" description="Events you're assigned to as a teacher. Update details or add photos from the drive." />
 
-        {/* Filter Buttons */}
-        <div className="flex gap-2">
-          {["all", "upcoming", "completed"].map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilter(type)}
-              className={`px-4 py-1 rounded-full border text-sm font-medium transition-all ${
-                filter === type
-                  ? "bg-green-600 text-white border-green-600 shadow-md"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </button>
-          ))}
-        </div>
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <Tabs id={tabsId} value={filter} onChange={setFilter} label="Filter events" tabs={FILTERS.map((f) => ({ ...f, count: counts[f.id] }))} className="flex-1" />
+        <SearchInput value={query} onChange={setQuery} placeholder="Search events" className="w-full lg:w-72" />
       </div>
 
-      {/* Event Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.length ? (
-          filtered.map((event) => (
-            <div
-              key={event._id}
-              className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-lg hover:border-green-400 transition-all duration-300"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
-                {event.title}
-              </h3>
-
-              <div className="space-y-2 text-sm text-gray-600">
-                <p className="flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-green-600" />
-                  {new Date(event.date).toLocaleDateString()}
-                </p>
-                <p className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-green-600" />
-                  {event.location || "Location not specified"}
-                </p>
-                <p className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-green-600" />
-                  {event.hours} hrs
-                </p>
-                <p className="flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-green-600" />
-                  {event.institution}
-                </p>
-              </div>
-
-              <div className="mt-3">
-                <span
-                  className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
-                    event.status === "Completed"
-                      ? "bg-green-100 text-green-700"
-                      : event.status === "Upcoming"
-                      ? "bg-orange-100 text-orange-700"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {event.status}
-                </span>
-              </div>
-
-              {/* Action Buttons */}
-              {/* <div className="mt-5 flex gap-3">
-                <button className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
-                  Mark Attendance
-                </button>
-                <button className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-                  View Attendance
-                </button>
-              </div> */}
-
-              {/* New Buttons */}
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={() => handleEditClick(event)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-yellow-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-yellow-600 transition"
-                >
-                  <Pencil size={16} /> Edit
-                </button>
-                <button
-                  onClick={() => setSelectedEvent(event)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition"
-                >
-                  <ImagePlus size={16} /> Upload
-                </button>
-              </div>
-            </div>
-          ))
+      <div {...tabPanelProps(tabsId, filter)}>
+        {events.loading ? (
+          <CardGridSkeleton count={4} />
+        ) : events.status === "error" ? (
+          <ErrorState error={events.error} onRetry={events.reload} />
+        ) : rows.length ? (
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {rows.map((event) => (
+              <li key={event._id} className="flex flex-col rounded-xl border border-line bg-paper p-5">
+                <div className="flex items-start gap-3">
+                  <DateBlock date={event.date} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+                    <p className="mt-2 truncate text-[15px] font-semibold text-fg">{event.title}</p>
+                  </div>
+                </div>
+                <ul className="mt-3 space-y-1.5 text-[13px] text-muted">
+                  <li className="flex items-center gap-2">
+                    <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
+                  </li>
+                  {event.institution ? (
+                    <li className="flex items-center gap-2">
+                      <Users aria-hidden="true" className="size-3.5" /> {event.institution}
+                    </li>
+                  ) : null}
+                </ul>
+                <div className="mt-auto flex gap-2 border-t border-line pt-4">
+                  <Button size="sm" variant="outline" icon={Pencil} onClick={() => setEditing(event)} className="flex-1">
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="ghost" icon={ImagePlus} onClick={() => setUploading(event)} className="flex-1">
+                    Photos
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
-          <div className="col-span-full flex justify-center items-center py-12">
-            <p className="text-gray-500 italic">No {filter} events found.</p>
-          </div>
+          <EmptyState icon={CalendarRange} title={q ? "No matches" : "No events yet"} description={q ? "Try a different name." : "Events you're assigned to will appear here."} />
         )}
       </div>
 
-      {/* ====================== */}
-      {/* Edit / Upload Modal */}
-      {/* ====================== */}
-      {selectedEvent && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-lg shadow-xl relative">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800">
-              {editForm.title ? "Edit Event" : "Upload Images"}
-            </h3>
-
-            {/* Edit Event Form */}
-            {editForm.title && (
-              <form onSubmit={handleEditSubmit} className="space-y-3">
-                <input
-                  type="text"
-                  name="title"
-                  value={editForm.title}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, title: e.target.value })
-                  }
-                  placeholder="Title"
-                  className="w-full border p-2 rounded-lg"
-                />
-                <textarea
-                  name="description"
-                  value={editForm.description}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, description: e.target.value })
-                  }
-                  placeholder="Description"
-                  className="w-full border p-2 rounded-lg"
-                />
-                <input
-                  type="date"
-                  name="date"
-                  value={editForm.date}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, date: e.target.value })
-                  }
-                  className="w-full border p-2 rounded-lg"
-                />
-                <input
-                  type="text"
-                  name="location"
-                  value={editForm.location}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, location: e.target.value })
-                  }
-                  placeholder="Location"
-                  className="w-full border p-2 rounded-lg"
-                />
-                <input
-                  type="number"
-                  name="hours"
-                  value={editForm.hours}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, hours: e.target.value })
-                  }
-                  placeholder="Hours"
-                  className="w-full border p-2 rounded-lg"
-                />
-                <select
-                  name="status"
-                  value={editForm.status}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, status: e.target.value })
-                  }
-                  className="w-full border p-2 rounded-lg"
-                >
-                  <option>Upcoming</option>
-                  <option>Ongoing</option>
-                  <option>Completed</option>
-                </select>
-
-                <div className="flex justify-end gap-3 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEvent(null)}
-                    className="px-4 py-2 border rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Upload Images Form */}
-            {!editForm.title && (
-              <form onSubmit={handleImageUpload} className="space-y-4">
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => setImages([...e.target.files])}
-                  className="w-full border p-2 rounded-lg"
-                />
-
-                {/* Preview */}
-                {images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {Array.from(images).map((file, i) => (
-                      <img
-                        key={i}
-                        src={URL.createObjectURL(file)}
-                        alt="preview"
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEvent(null)}
-                    className="px-4 py-2 border rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={uploading}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg"
-                  >
-                    {uploading ? "Uploading..." : "Upload"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+      <EditDrawer
+        event={editing}
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        onSaved={(updated) => {
+          events.mutate((list) => (list || []).map((e) => (e._id === updated._id ? { ...e, ...updated } : e)));
+          setEditing(null);
+        }}
+      />
+      <UploadDrawer event={uploading} open={Boolean(uploading)} onClose={() => setUploading(null)} />
+    </>
   );
-};
-
-export default MyEventsTeacher;
+}

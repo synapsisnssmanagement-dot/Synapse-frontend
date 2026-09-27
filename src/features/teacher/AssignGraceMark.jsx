@@ -1,259 +1,173 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useMemo, useState } from "react";
+import { Award, CalendarRange, Check, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
-import { motion } from "framer-motion";
-import { FaUserGraduate, FaClipboardCheck, FaEdit, FaTrash } from "react-icons/fa";
+import Avatar from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { Select } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import { Skeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import { formatDate } from "@/lib/format";
+import { sortEvents, useMyEvents } from "./data";
 
-const AssignGraceMark = () => {
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [participants, setParticipants] = useState([]);
-  const [marks, setMarks] = useState({});
-  const [loading, setLoading] = useState(false);
+const MAX_MARKS = 100;
 
-  const API_BASE = `${API_URL}/api`;
+function existingMark(student, eventId) {
+  const record = student.graceHistory?.find((h) => String(h.eventId?._id || h.eventId) === String(eventId));
+  return record ? record.marks : null;
+}
 
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const token = getToken();
-        const res = await axios.get(`${API_BASE}/teacher/teachermyevents`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setEvents(res.data.data.filter((e) => e.status === "Completed"));
-      } catch (err) {
-        toast.error("Failed to load events");
-      }
-    };
+export default function AssignGraceMark() {
+  const events = useMyEvents();
+  const [eventId, setEventId] = useState("");
+  const [query, setQuery] = useState("");
+  const [drafts, setDrafts] = useState({});
+  const [busy, setBusy] = useState(null);
+  const [removing, setRemoving] = useState(null);
 
-    loadEvents();
-  }, []);
+  const completed = useMemo(() => sortEvents((events.data || []).filter((e) => e.status === "Completed")), [events.data]);
+  const participants = useResource(
+    () => api.get(`/api/teacher/participantsofevents/${eventId}`).then((res) => res.data?.participants || []),
+    [eventId],
+    { enabled: Boolean(eventId) }
+  );
 
-  useEffect(() => {
-    const loadParticipants = async () => {
-      if (!selectedEvent) return;
+  const people = participants.data || [];
+  const q = query.trim().toLowerCase();
+  const visible = q ? people.filter((s) => `${s.name} ${s.department || ""}`.toLowerCase().includes(q)) : people;
 
-      try {
-        const token = getToken();
+  const draftFor = (student) => (drafts[student._id] ?? existingMark(student, eventId) ?? "");
 
-        const res = await axios.get(
-          `${API_BASE}/teacher/participantsofevents/${selectedEvent}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        const list = res.data.participants || [];
-        setParticipants(list);
-
-        const marksObj = {};
-
-        list.forEach((student) => {
-          const record = student.graceHistory?.find((h) => {
-            const id = h.eventId?._id || h.eventId;
-            return id === selectedEvent;
-          });
-
-          marksObj[student._id] = record ? record.marks : "";
-        });
-
-        setMarks(marksObj);
-      } catch (err) {
-        toast.error("Failed to load participants");
-      }
-    };
-
-    loadParticipants();
-  }, [selectedEvent]);
-
-  const refresh = async () => {
-    if (!selectedEvent) return;
-
-    const token = getToken();
-    const res = await axios.get(
-      `${API_BASE}/teacher/participantsofevents/${selectedEvent}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const list = res.data.participants || [];
-    setParticipants(list);
-
-    const marksObj = {};
-
-    list.forEach((student) => {
-      const record = student.graceHistory?.find((h) => {
-        const id = h.eventId?._id || h.eventId;
-        return id === selectedEvent;
-      });
-      marksObj[student._id] = record ? record.marks : "";
-    });
-
-    setMarks(marksObj);
-  };
-
-  const applyMarks = async (studentId, type) => {
-    const value = marks[studentId];
-
-    if (value === "" || isNaN(value)) {
-      toast.warn("Enter valid marks");
+  const apply = async (student) => {
+    const value = Number(draftFor(student));
+    if (!Number.isFinite(value) || value <= 0 || value > MAX_MARKS) {
+      toast.warn(`Enter marks between 1 and ${MAX_MARKS}.`);
       return;
     }
-
-    setLoading(true);
-
+    const already = existingMark(student, eventId) != null;
+    setBusy(student._id);
     try {
-      const token = getToken();
-
-      if (type === "assign") {
-        await axios.post(
-          `${API_BASE}/teacher/grace-marks`,
-          { studentId, eventId: selectedEvent, marks: Number(value) },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        toast.success("Assigned");
+      if (already) {
+        await api.put(`/api/teacher/update/${student._id}/${eventId}`, { marks: value });
       } else {
-        await axios.put(
-          `${API_BASE}/teacher/update/${studentId}/${selectedEvent}`,
-          { marks: Number(value) },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        toast.success("Updated");
+        await api.post("/api/teacher/grace-marks", { studentId: student._id, eventId, marks: value });
       }
-
-      await refresh();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Action failed");
+      participants.mutate((list) =>
+        (list || []).map((s) =>
+          s._id === student._id
+            ? { ...s, graceHistory: already ? s.graceHistory.map((h) => (String(h.eventId?._id || h.eventId) === eventId ? { ...h, marks: value } : h)) : [...(s.graceHistory || []), { eventId, marks: value }] }
+            : s
+        )
+      );
+      toast.success(`${already ? "Updated" : "Assigned"} ${value} marks for ${student.name}.`);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't save those marks."));
+    } finally {
+      setBusy(null);
     }
-
-    setLoading(false);
   };
 
-  const deleteMarks = async (studentId) => {
-    if (!window.confirm("Delete marks for this event?")) return;
-
-    setLoading(true);
-
+  const remove = async () => {
+    const student = removing;
+    setBusy(student._id);
     try {
-      const token = getToken();
-
-      await axios.delete(
-        `${API_BASE}/teacher/delete/${studentId}/${selectedEvent}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success("Deleted");
-      await refresh();
-    } catch (err) {
-      toast.error("Failed");
+      await api.delete(`/api/teacher/delete/${student._id}/${eventId}`);
+      participants.mutate((list) => (list || []).map((s) => (s._id === student._id ? { ...s, graceHistory: (s.graceHistory || []).filter((h) => String(h.eventId?._id || h.eventId) !== eventId) } : s)));
+      setDrafts((prev) => ({ ...prev, [student._id]: "" }));
+      toast.success(`Removed grace marks for ${student.name}.`);
+      setRemoving(null);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't remove those marks."));
+    } finally {
+      setBusy(null);
     }
-
-    setLoading(false);
   };
 
   return (
-    <div className="p-4 md:p-8 bg-green-50 min-h-screen">
-      <motion.h1
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-3xl md:text-4xl font-bold text-green-800 text-center mb-10"
-      >
-        🌱 Manage Event-wise Grace Marks
-      </motion.h1>
+    <>
+      <PageHeader eyebrow="Recognition" title="Assign grace marks" description="Award grace marks directly for a completed event you supervised." />
 
-      <div className="max-w-xl mx-auto bg-white p-5 rounded-lg shadow">
-        <select
-          className="w-full p-3 border rounded-lg"
-          value={selectedEvent}
-          onChange={(e) => setSelectedEvent(e.target.value)}
-        >
-          <option value="">Select Completed Event</option>
-          {events.map((event) => (
-            <option key={event._id} value={event._id}>
-              {event.title}
+      {events.loading ? (
+        <Skeleton className="h-11 w-full max-w-md" />
+      ) : events.status === "error" ? (
+        <ErrorState error={events.error} onRetry={events.reload} />
+      ) : completed.length ? (
+        <Select label="Completed event" className="max-w-md" value={eventId} onChange={(e) => setEventId(e.target.value)} placeholder="Choose a completed event">
+          {completed.map((e) => (
+            <option key={e._id} value={e._id}>
+              {e.title} — {formatDate(e.date, "short")}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      ) : (
+        <EmptyState icon={CalendarRange} title="No completed events yet" description="Grace marks can be assigned once an event you supervised is complete." />
+      )}
 
-      {selectedEvent && (
-        <div className="max-w-6xl mx-auto mt-8 bg-white shadow rounded-lg p-4 overflow-x-auto">
-          <table className="w-full min-w-[800px] border">
-            <thead>
-              <tr className="bg-green-100 text-green-800">
-                <th className="p-2">Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2 text-center">Current</th>
-                <th className="p-2 text-center">New Marks</th>
-                <th className="p-2 text-center">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {participants.map((s) => {
-                const record = s.graceHistory?.find((h) => {
-                  const id = h.eventId?._id || h.eventId;
-                  return id === selectedEvent;
-                });
-
-                const current = record ? record.marks : "—";
-
-                return (
-                  <tr key={s._id} className="border-b hover:bg-green-50">
-                    <td className="p-2 flex items-center gap-2">
-                      <FaUserGraduate className="text-green-600" />
-                      {s.name}
-                    </td>
-                    <td className="p-2">{s.email}</td>
-                    <td className="p-2 text-center">{current}</td>
-                    <td className="p-2 text-center">
+      {eventId ? (
+        <div className="mt-6">
+          {participants.loading ? (
+            <TableSkeleton rows={5} columns={3} />
+          ) : participants.status === "error" ? (
+            <ErrorState error={participants.error} onRetry={participants.reload} />
+          ) : people.length ? (
+            <div className="overflow-hidden rounded-xl border border-line bg-paper">
+              <div className="border-b border-line p-4">
+                <SearchInput value={query} onChange={setQuery} placeholder="Search students" className="max-w-xs" />
+              </div>
+              <ul className="divide-y divide-line">
+                {visible.map((student) => {
+                  const has = existingMark(student, eventId) != null;
+                  return (
+                    <li key={student._id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:flex-nowrap">
+                      <Avatar name={student.name} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14.5px] font-medium text-fg">{student.name}</span>
+                        <span className="block truncate text-[12.5px] text-muted">{student.department || student.email}</span>
+                      </span>
+                      {has ? <Badge tone="success">Assigned</Badge> : null}
                       <input
                         type="number"
-                        value={marks[s._id]}
-                        onChange={(e) =>
-                          setMarks({ ...marks, [s._id]: e.target.value })
-                        }
-                        className="w-20 p-1 border rounded text-center"
+                        min={1}
+                        max={MAX_MARKS}
+                        value={draftFor(student)}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [student._id]: e.target.value }))}
+                        aria-label={`Marks for ${student.name}`}
+                        placeholder="Marks"
+                        className="tabular h-10 w-24 rounded-lg border border-line bg-paper px-3 text-[14px] focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand/15"
                       />
-                    </td>
-                    <td className="p-2 text-center space-x-2">
-                      <button
-                        className="bg-green-600 text-white px-3 py-1 rounded"
-                        onClick={() => applyMarks(s._id, "assign")}
-                      >
-                        Assign
-                      </button>
-
-                      <button
-                        className="bg-blue-600 text-white px-3 py-1 rounded"
-                        onClick={() => applyMarks(s._id, "update")}
-                      >
-                        <FaEdit />
-                      </button>
-
-                      <button
-                        className="bg-red-600 text-white px-3 py-1 rounded"
-                        onClick={() => deleteMarks(s._id)}
-                      >
-                        <FaTrash />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {participants.length === 0 && (
-            <p className="text-center text-gray-600 py-4">
-              No participants found.
-            </p>
+                      <Button size="sm" icon={Check} loading={busy === student._id} onClick={() => apply(student)}>
+                        {has ? "Update" : "Assign"}
+                      </Button>
+                      {has ? (
+                        <Button size="sm" variant="ghost" icon={Trash2} onClick={() => setRemoving(student)} aria-label={`Remove grace marks for ${student.name}`} className="hover:bg-red-50 hover:text-red-600" />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : (
+            <EmptyState icon={Award} title="No students to award" description="Nobody has attended this event yet." />
           )}
         </div>
-      )}
-    </div>
-  );
-};
+      ) : null}
 
-export default AssignGraceMark;
+      <ConfirmDialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        onConfirm={remove}
+        loading={busy === removing?._id}
+        title={`Remove grace marks for ${removing?.name || "this student"}?`}
+        confirmLabel="Remove marks"
+        description="Their total grace marks will be recalculated without this event."
+      />
+    </>
+  );
+}
