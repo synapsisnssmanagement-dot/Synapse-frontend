@@ -67,12 +67,8 @@ const PaymentModal = ({ event, onClose }) => {
       if (result.paymentIntent.status === "succeeded") {
         await axios.post(
           `${API_URL}/api/donations/save`,
-          {
-            eventId: event._id,
-            amount,
-            paymentId: result.paymentIntent.id,
-            message,
-          },
+          // amount and event are taken from the PaymentIntent server-side
+          { paymentId: result.paymentIntent.id, message },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
