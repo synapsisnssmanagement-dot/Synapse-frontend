@@ -9,6 +9,7 @@ import Logo from "@/components/brand/Logo";
 import { useDialogBehaviour, useIsClient } from "@/components/ui/Dialog";
 import { gsap, useIsoLayoutEffect } from "@/lib/motion/gsap";
 import cx from "@/lib/cx";
+import { useLenis } from "@/lib/motion/SmoothScroll";
 import { SIGNUP_ROLES } from "./content";
 
 const EXPO = [0.16, 1, 0.3, 1];
@@ -170,29 +171,68 @@ export default function SiteNav({ links }) {
   const [hidden, setHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const progressRef = useRef(null);
+  const lenisRef = useLenis();
 
   useEffect(() => {
-    let last = window.scrollY;
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const y = window.scrollY;
-      setScrolled(y > 24);
-      if (Math.abs(y - last) > 6) {
-        setHidden(y > 520 && y > last);
-        last = y;
+    let lastY = window.scrollY;
+    let accumulatedDelta = 0;
+    const SCROLL_THRESHOLD = 80;
+    const DELTA_TRIGGER = 10;
+
+    const handleMovement = (currentY, delta) => {
+      setScrolled(currentY > 20);
+
+      // Near the top of the page: always show navbar in default place
+      if (currentY <= SCROLL_THRESHOLD) {
+        setHidden(false);
+        accumulatedDelta = 0;
+        lastY = currentY;
+        return;
       }
+
+      // Reset accumulation when reversing direction
+      if ((delta > 0 && accumulatedDelta < 0) || (delta < 0 && accumulatedDelta > 0)) {
+        accumulatedDelta = 0;
+      }
+      accumulatedDelta += delta;
+
+      // Scrolling down with intent -> smooth slide up
+      if (accumulatedDelta > DELTA_TRIGGER) {
+        setHidden(true);
+      }
+      // Scrolling up with intent -> smooth slide down
+      else if (accumulatedDelta < -DELTA_TRIGGER) {
+        setHidden(false);
+      }
+
+      lastY = currentY;
     };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
+
+    const lenis = lenisRef?.current;
+    let unsubscribeLenis = null;
+
+    if (lenis) {
+      const onLenis = (e) => {
+        const currentY = typeof e.scroll === "number" ? e.scroll : window.scrollY;
+        const delta = currentY - lastY;
+        handleMovement(currentY, delta);
+      };
+      unsubscribeLenis = lenis.on("scroll", onLenis);
+    }
+
+    const onNativeScroll = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastY;
+      handleMovement(currentY, delta);
     };
-    frame = requestAnimationFrame(update);
-    window.addEventListener("scroll", onScroll, { passive: true });
+
+    window.addEventListener("scroll", onNativeScroll, { passive: true });
+
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(frame);
+      if (typeof unsubscribeLenis === "function") unsubscribeLenis();
+      window.removeEventListener("scroll", onNativeScroll);
     };
-  }, []);
+  }, [lenisRef]);
 
   useIsoLayoutEffect(() => {
     const bar = progressRef.current;
@@ -218,9 +258,13 @@ export default function SiteNav({ links }) {
       </a>
       <header
         className={cx(
-          "fixed inset-x-0 top-0 z-(--z-nav) transition-[transform,background-color,border-color] duration-500 ease-out-expo",
-          scrolled ? "border-b border-line bg-paper/88 backdrop-blur-md" : "border-b border-transparent bg-transparent",
-          hidden && !menuOpen ? "-translate-y-full" : "translate-y-0"
+          "fixed inset-x-0 top-0 z-(--z-nav) transform-gpu transition-all duration-500 ease-out-expo will-change-transform",
+          scrolled
+            ? "border-b border-line/80 bg-paper/90 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.06)]"
+            : "border-b border-transparent bg-transparent",
+          hidden && !menuOpen
+            ? "-translate-y-full opacity-0 pointer-events-none"
+            : "translate-y-0 opacity-100 pointer-events-auto"
         )}
       >
         <div className="container-editorial flex h-18 items-center justify-between gap-6">
