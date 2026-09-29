@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, ExternalLink, FileText, Mail, Phone, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Avatar from "@/components/ui/Avatar";
 import { LevelBadge, StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";

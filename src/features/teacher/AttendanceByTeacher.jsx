@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarDays, CalendarRange, Check, MapPin, Users, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/DataTable";

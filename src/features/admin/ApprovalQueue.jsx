@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Check, CheckCircle2, FileCheck2, FileX2, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DataTable from "@/components/ui/DataTable";

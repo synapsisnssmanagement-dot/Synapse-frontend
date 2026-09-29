@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Award, CheckCircle2, Send } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/DataTable";
 import { Select, Textarea } from "@/components/ui/Field";

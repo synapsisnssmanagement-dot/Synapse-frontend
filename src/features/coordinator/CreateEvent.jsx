@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Bell, CalendarDays, CalendarPlus, CheckCircle2, Clock3, MapPin, Presentation, Users } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Field";

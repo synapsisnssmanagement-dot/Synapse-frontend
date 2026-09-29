@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { IconButton } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/States";

@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { Check, EyeOff, Lock, Quote } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Identity from "@/components/ui/Identity";

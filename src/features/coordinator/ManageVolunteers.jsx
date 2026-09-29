@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarRange, UserMinus, UserPlus, Users } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Avatar from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";

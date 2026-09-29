@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { GraduationCap, HeartHandshake, Search, Sparkles, Undo2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DataTable from "@/components/ui/DataTable";

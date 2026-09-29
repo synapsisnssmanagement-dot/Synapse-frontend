@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, ArrowLeft, Building2, Check, Circle, Mail, Phone, RotateCw, UserRound } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import { Input, PasswordInput, Select } from "@/components/ui/Field";
 import { Accent } from "@/components/ui/PageHeader";

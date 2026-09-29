@@ -234,33 +234,9 @@
 }
 
 /* ------------------------------------------------------------------
-   Toasts — quiet ink surface, emerald only for success.
+   Toasts (Sonner) — font matching and z-index
 ------------------------------------------------------------------- */
-:root {
-  --toastify-font-family: var(--font-sans);
-  --toastify-color-success: var(--color-brand);
-  --toastify-color-error: var(--color-danger);
-  --toastify-color-warning: var(--color-warning);
-  --toastify-color-info: var(--color-info);
-  --toastify-toast-bd-radius: 10px;
-  --toastify-z-index: var(--z-toast);
-}
-
-.Toastify__toast {
-  background: var(--color-ink);
-  color: var(--color-on-dark);
-  border: 1px solid var(--color-line-dark);
-  box-shadow: var(--shadow-elevated);
-  font-size: 0.9rem;
-  font-weight: 500;
-  min-height: 56px;
-}
-
-.Toastify__close-button {
-  color: var(--color-subtle);
-  opacity: 1;
-}
-
-.Toastify__progress-bar--wrp {
-  opacity: 0.5;
+[data-sonner-toaster] {
+  font-family: var(--font-sans);
+  z-index: var(--z-toast) !important;
 }

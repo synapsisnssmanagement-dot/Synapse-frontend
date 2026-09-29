@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { CalendarDays, CalendarRange, ImagePlus, MapPin, Pencil, Users } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/DataTable";
@@ -97,7 +97,7 @@ function UploadDrawer({ event, open, onClose }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!files.length) {
-      toast.warn("Choose at least one photo.");
+      toast.warning("Choose at least one photo.");
       return;
     }
     setUploading(true);

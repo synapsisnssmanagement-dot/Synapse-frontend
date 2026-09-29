@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FiCalendar, FiMapPin, FiClock, FiRefreshCcw } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 import {

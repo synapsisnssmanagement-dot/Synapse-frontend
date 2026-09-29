@@ -4,7 +4,7 @@ import { getToken } from "@/utils/auth";
 import { API_URL } from "@/utils/config";
 import React, { useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const AlumniTestimonials = () => {
   const [message, setMessage] = useState("");

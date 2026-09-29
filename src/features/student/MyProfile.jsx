@@ -4,7 +4,7 @@ import { getToken } from "@/utils/auth";
 import { API_URL } from "@/utils/config";
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   FiUser,
   FiPhone,

@@ -1,7 +1,6 @@
 import "./globals.css";
-import "react-toastify/dist/ReactToastify.css";
 import { Plus_Jakarta_Sans, Instrument_Serif } from "next/font/google";
-import { ToastContainer } from "react-toastify";
+import { Toaster } from "sonner";
 import EmotionRegistry from "@/components/EmotionRegistry";
 import { SocketProvider } from "@/context/SocketContext";
 
@@ -65,7 +64,7 @@ export default function RootLayout({ children }) {
       <body>
         <EmotionRegistry>
           <SocketProvider>
-            <ToastContainer position="bottom-right" autoClose={3500} newestOnTop theme="dark" />
+            <Toaster position="bottom-right" richColors closeButton />
             {children}
           </SocketProvider>
         </EmotionRegistry>

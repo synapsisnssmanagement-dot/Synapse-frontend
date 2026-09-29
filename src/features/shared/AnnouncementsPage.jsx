@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { CheckCheck, Megaphone, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { IconButton } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import PageHeader from "@/components/ui/PageHeader";

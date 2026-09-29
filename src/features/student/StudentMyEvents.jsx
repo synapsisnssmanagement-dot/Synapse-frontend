@@ -18,7 +18,7 @@ import {
   FaPhoneAlt,
   FaBuilding,
 } from "react-icons/fa";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const StudentMyEvents = () => {
   const [events, setEvents] = useState([]);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Award, Check, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Avatar from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";

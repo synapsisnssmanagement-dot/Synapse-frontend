@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, MailCheck } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import { Accent } from "@/components/ui/PageHeader";
 import api, { errorMessage } from "@/lib/api";

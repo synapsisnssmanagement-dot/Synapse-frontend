@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Building2, Pencil, Plus, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import DataTable from "@/components/ui/DataTable";
 import { ConfirmDialog, Drawer } from "@/components/ui/Dialog";

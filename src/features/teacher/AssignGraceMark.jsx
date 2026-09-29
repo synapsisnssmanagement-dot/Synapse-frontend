@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Award, CalendarRange, Check, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Avatar from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -48,7 +48,7 @@ export default function AssignGraceMark() {
   const apply = async (student) => {
     const value = Number(draftFor(student));
     if (!Number.isFinite(value) || value <= 0 || value > MAX_MARKS) {
-      toast.warn(`Enter marks between 1 and ${MAX_MARKS}.`);
+      toast.warning(`Enter marks between 1 and ${MAX_MARKS}.`);
       return;
     }
     const already = existingMark(student, eventId) != null;

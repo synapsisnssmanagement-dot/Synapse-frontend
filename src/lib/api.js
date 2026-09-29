@@ -1,5 +1,5 @@
 import axios from "axios";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { API_URL } from "@/utils/config";
 import { clearSession, getToken } from "@/utils/auth";
 
