@@ -1,36 +1,35 @@
 "use client";
 
-// src/pages/SuccessDonation.jsx
-import React from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { FiCheckCircle } from "react-icons/fi";
+import { HeartHandshake } from "lucide-react";
+import Button from "@/components/ui/Button";
+import { Accent } from "@/components/ui/PageHeader";
+import { formatCurrency } from "@/lib/format";
 
-const SuccessDonation = () => {
-  const searchParams = useSearchParams();
-
-  const amount = searchParams.get("amount") || "—";
-  const eventName = searchParams.get("eventName") || "the event";
+export default function SuccessDonation() {
+  const params = useSearchParams();
+  const amount = Number(params.get("amount"));
+  const eventName = params.get("eventName") || "the drive";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-green-100 p-6">
-      <div className="bg-white rounded-2xl shadow-xl p-10 max-w-md text-center">
-        <FiCheckCircle size={84} className="text-green-600 mx-auto" />
-        <h2 className="text-3xl font-bold mt-4 text-green-800">Thank you for your donation!</h2>
-
-        <p className="text-md text-gray-600 mt-3">
-          Your contribution of <span className="font-semibold">₹{amount}</span> to <span className="font-semibold">{eventName}</span> has been processed successfully.
-        </p>
-
-        <Link
-          href="/alumnilayout/donations"
-          className="mt-6 inline-block bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold"
-        >
-          Back to Donations
-        </Link>
+    <div className="mx-auto flex max-w-xl flex-col items-center py-16 text-center">
+      <span className="flex size-14 items-center justify-center rounded-2xl border border-brand/25 bg-mint text-brand-700">
+        <HeartHandshake aria-hidden="true" className="size-6" />
+      </span>
+      <h1 className="mt-8 text-[clamp(2rem,4vw,3rem)] font-semibold leading-tight tracking-[-0.04em] text-ink">
+        Thank you. <Accent>Truly.</Accent>
+      </h1>
+      <p className="mt-4 text-[16px] leading-relaxed text-fg-2">
+        Your gift{Number.isFinite(amount) && amount > 0 ? ` of ${formatCurrency(amount)}` : ""} to <span className="font-semibold text-fg">{eventName}</span> was received. It goes straight to the volunteers running that drive.
+      </p>
+      <div className="mt-10 flex flex-wrap justify-center gap-3">
+        <Button href="/alumnilayout/dashboard" variant="dark">
+          Back to dashboard
+        </Button>
+        <Button href="/alumnilayout/donations" variant="outline">
+          Support another drive
+        </Button>
       </div>
     </div>
   );
-};
-
-export default SuccessDonation;
+}

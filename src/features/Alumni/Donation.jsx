@@ -1,276 +1,183 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-// src/pages/Donation.jsx
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { FiCalendar, FiMapPin, FiClock, FiRefreshCcw } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
-
+import { CalendarDays, HandCoins, Lock, MapPin } from "lucide-react";
+import { toast } from "sonner";
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import DateBlock from "@/components/ui/DateBlock";
+import { Modal } from "@/components/ui/Dialog";
+import { Textarea } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import cx from "@/lib/cx";
+import { formatCurrency, formatDate } from "@/lib/format";
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-);
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) : null;
+const PRESETS = [500, 1000, 2500, 5000];
+const MIN = 50;
 
-/* ===========================================
-    PAYMENT MODAL (Responsive)
-=========================================== */
-const PaymentModal = ({ event, onClose }) => {
+const CARD_OPTIONS = {
+  hidePostalCode: true,
+  style: {
+    base: { fontSize: "15px", color: "#0f172a", fontFamily: "system-ui, sans-serif", "::placeholder": { color: "#94a3b8" } },
+    invalid: { color: "#dc2626" },
+  },
+};
+
+function PaymentForm({ event, onDone }) {
   const stripe = useStripe();
   const elements = useElements();
-  const navigate = useRouter();
-
-  const [amount, setAmount] = useState("");
+  const router = useRouter();
+  const [amount, setAmount] = useState("1000");
   const [message, setMessage] = useState("");
   const [processing, setProcessing] = useState(false);
 
-  const token = getToken();
-
-  const handlePay = async () => {
-    if (!amount || Number(amount) < 50) {
-      toast.error("Minimum donation amount is ₹50");
+  const pay = async (e) => {
+    e.preventDefault();
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < MIN) {
+      toast.error(`The minimum donation is ${formatCurrency(MIN)}.`);
       return;
     }
-
+    if (!stripe || !elements) return;
+    setProcessing(true);
     try {
-      setProcessing(true);
-
-      const res = await axios.post(
-        `${API_URL}/api/donations/create-intent`,
-        { amount, eventId: event._id },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const clientSecret = res.data.clientSecret;
-
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: { card: elements.getElement(CardElement) },
-      });
-
+      const intent = await api.post("/api/donations/create-intent", { amount: value, eventId: event._id });
+      const result = await stripe.confirmCardPayment(intent.data.clientSecret, { payment_method: { card: elements.getElement(CardElement) } });
       if (result.error) {
         toast.error(result.error.message);
-        setProcessing(false);
         return;
       }
-
-      if (result.paymentIntent.status === "succeeded") {
-        await axios.post(
-          `${API_URL}/api/donations/save`,
-          // The server reads amount and event from the PaymentIntent; these are
-          // sent only so an older deployed backend still records the donation.
-          {
-            eventId: event._id,
-            amount,
-            paymentId: result.paymentIntent.id,
-            message,
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        navigate.push(
-          `/alumnilayout/success-donation?amount=${encodeURIComponent(
-            amount
-          )}&eventName=${encodeURIComponent(event.title)}`
-        );
-
-        onClose();
+      if (result.paymentIntent?.status === "succeeded") {
+        // amount and eventId are ignored by current servers (they read them from Stripe) but
+        // are still sent so older backend deployments keep recording donations.
+        await api.post("/api/donations/save", { eventId: event._id, amount: value, paymentId: result.paymentIntent.id, message: message.trim() });
+        onDone();
+        router.push(`/alumnilayout/success-donation?amount=${encodeURIComponent(value)}&eventName=${encodeURIComponent(event.title)}`);
       }
-    } catch (err) {
-      toast.error("Payment failed. Try again.");
+    } catch (error) {
+      toast.error(errorMessage(error, "The payment didn't go through. You haven't been charged twice — try again."));
     } finally {
       setProcessing(false);
     }
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 bg-black/40 flex justify-center items-center p-4 sm:p-6 z-[999]"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-white w-full max-w-md rounded-xl p-6 sm:p-8 shadow-xl relative border border-gray-200"
-        >
-          {/* CLOSE */}
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 text-gray-600 hover:text-red-500 text-xl"
-          >
-            ×
-          </button>
-
-          {/* Stripe Branding */}
-          <div className="flex justify-center mb-4">
-            <img
-              src="https://cdn.worldvectorlogo.com/logos/stripe-4.svg"
-              alt="Stripe"
-              className="h-6 opacity-90"
-            />
-          </div>
-
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800 text-center mb-2">
-            Secure Donation
-          </h2>
-
-          <p className="text-center text-gray-600 text-sm mb-4">
-            Event: <span className="font-semibold">{event.title}</span>
-          </p>
-
-          {/* AMOUNT */}
-          <label className="block text-sm font-medium text-gray-700">
-            Amount (₹)
-          </label>
-          <input
-            type="number"
-            value={amount}
-            placeholder="Min ₹50"
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full mt-1 mb-4 p-3 rounded-md border border-gray-300"
-          />
-
-          {/* MESSAGE */}
-          <label className="block text-sm font-medium text-gray-700">
-            Message (optional)
-          </label>
-          <textarea
-            className="w-full p-3 mt-1 mb-4 rounded-md border border-gray-300"
-            placeholder="Write a short note..."
-            onChange={(e) => setMessage(e.target.value)}
-          />
-
-          {/* CARD FIELD */}
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Card Details
-          </label>
-          <div className="border border-gray-300 rounded-md p-3 mb-5 shadow-sm bg-white">
-            <CardElement />
-          </div>
-
-          {/* PAY BUTTON */}
-          <button
-            onClick={handlePay}
-            disabled={!stripe || processing}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold"
-          >
-            {processing ? "Processing..." : `Pay ₹${amount || ""}`}
-          </button>
-
-          <p className="text-center mt-4 text-gray-500 text-xs">
-            🔒 Payments securely processed by Stripe
-          </p>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+    <form id="donation-form" onSubmit={pay} className="space-y-6">
+      <fieldset>
+        <legend className="mb-2 text-[13px] font-semibold text-fg">Amount</legend>
+        <div className="grid grid-cols-4 gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setAmount(String(p))}
+              aria-pressed={Number(amount) === p}
+              className={cx(
+                "tabular h-11 rounded-lg border text-[14px] font-semibold transition-colors",
+                Number(amount) === p ? "border-ink bg-ink text-white" : "border-line bg-paper text-fg hover:border-line-strong"
+              )}
+            >
+              {formatCurrency(p)}
+            </button>
+          ))}
+        </div>
+        <label className="mt-3 flex h-11 items-center gap-2 rounded-lg border border-line bg-paper px-3.5 focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand/15">
+          <span className="text-[15px] font-semibold text-muted">₹</span>
+          <span className="sr-only">Custom amount</span>
+          <input type="number" min={MIN} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} className="tabular h-full flex-1 bg-transparent text-[15px] outline-none" />
+        </label>
+        <p className="mt-1.5 text-[12.5px] text-muted">Minimum {formatCurrency(MIN)}.</p>
+      </fieldset>
+      <Textarea label="Message" rows={2} placeholder="A note for the volunteers (optional)" value={message} onChange={(e) => setMessage(e.target.value)} />
+      <div>
+        <p className="mb-2 text-[13px] font-semibold text-fg">Card</p>
+        <div className="rounded-lg border border-line bg-paper px-3.5 py-3.5">
+          <CardElement options={CARD_OPTIONS} />
+        </div>
+        <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-muted">
+          <Lock aria-hidden="true" className="size-3.5" /> Processed securely by Stripe. Card details never touch Synapsis.
+        </p>
+      </div>
+      <Button type="submit" fullWidth size="lg" icon={HandCoins} loading={processing} disabled={!stripe}>
+        {processing ? "Processing" : `Donate ${Number(amount) >= MIN ? formatCurrency(Number(amount)) : ""}`}
+      </Button>
+    </form>
   );
-};
+}
 
-/* ===========================================
-    MAIN DONATION PAGE (Responsive)
-=========================================== */
-const Donation = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+export default function Donation() {
+  const events = useResource(() => api.get("/api/alumni/getalleventsalumniinstituition").then((res) => res.data?.events || []), []);
+  const [giving, setGiving] = useState(null);
 
-  const token = getToken();
-
-  const fetchEvents = async () => {
-    try {
-      const res = await axios.get(
-        `${API_URL}/api/alumni/getalleventsalumniinstituition`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setEvents(res.data.events || []);
-    } catch {
-      toast.error("Failed loading events");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
-  if (loading) return <p className="p-6 text-center">Loading events...</p>;
+  const open = (events.data || []).filter((e) => e.donationOpen && e.status !== "Cancelled");
+  const raised = (events.data || []).reduce((sum, e) => sum + (Number(e.totalCollected) || 0), 0);
 
   return (
-    <Elements stripe={stripePromise}>
-      <div className="min-h-screen bg-white p-4 sm:p-6 lg:p-10">
-        <div className="max-w-6xl mx-auto">
+    <>
+      <PageHeader
+        eyebrow="Giving"
+        title="Support a drive"
+        description="Give directly to an event your unit is running. Every rupee goes to that drive."
+        meta={raised ? <span className="tabular font-semibold text-fg">{formatCurrency(raised)} raised across your institution</span> : null}
+      />
 
-          {/* HEADER */}
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold text-green-800">
-              Support Your Institution’s Events
-            </h2>
+      {!stripePromise ? (
+        <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-800">Online payments aren&apos;t configured yet. Please try again later.</p>
+      ) : null}
 
-            <button
-              onClick={fetchEvents}
-              className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto"
-            >
-              <FiRefreshCcw /> Refresh
-            </button>
-          </div>
-
-          {/* EVENT GRID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((e) => (
-              <motion.div
-                key={e._id}
-                whileHover={{ scale: 1.02 }}
-                className="bg-white border border-green-500 rounded-xl p-6 shadow-md flex flex-col justify-between"
-              >
-                <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-green-800">{e.title}</h3>
-                  <p className="text-gray-600 text-sm mb-3">{e.description}</p>
-
-                  <div className="space-y-1 text-gray-700 text-sm">
-                    <p className="flex items-center gap-2"><FiCalendar /> {new Date(e.date).toLocaleDateString()}</p>
-                    <p className="flex items-center gap-2"><FiMapPin /> {e.location}</p>
-                    <p className="flex items-center gap-2"><FiClock /> {e.hours} hrs</p>
-                  </div>
-
-                  <div className="mt-4 text-sm font-semibold text-green-700">
-                    Donation: {e.donationOpen ? "OPEN" : "CLOSED"}
-                  </div>
-                  <div className="text-sm font-semibold text-gray-700">
-                    Total Collected: ₹{e.totalCollected}
-                  </div>
+      {events.loading ? (
+        <CardGridSkeleton count={3} />
+      ) : events.status === "error" ? (
+        <ErrorState error={events.error} onRetry={events.reload} />
+      ) : open.length ? (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {open.map((event) => (
+            <li key={event._id} className="flex flex-col rounded-xl border border-line bg-paper p-5">
+              <div className="flex items-start gap-3">
+                <DateBlock date={event.date} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+                  <p className="mt-2 text-[15px] font-semibold leading-snug text-fg">{event.title}</p>
                 </div>
+              </div>
+              {event.description ? <p className="mt-3 line-clamp-3 text-[14px] leading-relaxed text-fg-2">{event.description}</p> : null}
+              <ul className="mt-3 space-y-1.5 text-[13px] text-muted">
+                <li className="flex items-center gap-2">
+                  <CalendarDays aria-hidden="true" className="size-3.5" /> {formatDate(event.date)}
+                </li>
+                <li className="flex items-center gap-2">
+                  <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "—"}
+                </li>
+              </ul>
+              <div className="mt-auto pt-5">
+                <p className="tabular text-xl font-semibold text-fg">{formatCurrency(Number(event.totalCollected) || 0)}</p>
+                <p className="text-[12.5px] text-muted">raised so far</p>
+                <Button fullWidth className="mt-4" icon={HandCoins} disabled={!stripePromise} onClick={() => setGiving(event)}>
+                  Donate
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState icon={HandCoins} title="No drives are accepting donations" description="When a coordinator opens an event to donations, it will appear here." />
+      )}
 
-                {e.donationOpen && (
-                  <button
-                    onClick={() => setSelectedEvent(e)}
-                    className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-md font-semibold"
-                  >
-                    Donate Now
-                  </button>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* MODAL */}
-        {selectedEvent && (
-          <PaymentModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-        )}
-      </div>
-    </Elements>
+      <Modal open={Boolean(giving)} onClose={() => setGiving(null)} eyebrow="Donation" title={giving?.title || ""} description="Your gift goes to this drive.">
+        {giving && stripePromise ? (
+          <Elements stripe={stripePromise}>
+            <PaymentForm event={giving} onDone={() => setGiving(null)} />
+          </Elements>
+        ) : null}
+      </Modal>
+    </>
   );
-};
-
-export default Donation;
+}

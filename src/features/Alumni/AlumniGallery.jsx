@@ -1,148 +1,62 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Images } from "lucide-react";
+import { Modal } from "@/components/ui/Dialog";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api from "@/lib/api";
+import { formatDate } from "@/lib/format";
 
-const AlumniGallery = () => {
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedIndex, setSelectedIndex] = useState(null);
+// Photos from the alumni's own institution, taken from its events. (The dedicated
+// /api/alumni/allinstituteimages route is guarded by both alumniOnly and
+// superAdminOnly, so no account can ever reach it.)
+async function loadImages() {
+  const res = await api.get("/api/alumni/getalleventsalumniinstituition");
+  return (res.data?.events || []).flatMap((event) =>
+    (event.images || []).map((img) => ({ id: img._id || img.url, url: img.url, caption: img.caption, eventTitle: event.title, eventDate: event.date }))
+  );
+}
 
-  const token = getToken();
-
-  useEffect(() => {
-    const fetchImages = async () => {
-      try {
-        const res = await axios.get(
-          `${API_URL}/api/alumni/allinstituteimages`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        setImages(res.data.images || []);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchImages();
-  }, []);
-
-  // Handle Modal Navigation
-  const nextImage = () => {
-    setSelectedIndex((prev) => (prev + 1) % images.length);
-  };
-
-  const prevImage = () => {
-    setSelectedIndex((prev) =>
-      prev === 0 ? images.length - 1 : prev - 1
-    );
-  };
-
-  // Loading Skeleton
-  if (loading) {
-    return (
-      <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="w-full h-48 bg-gray-300 animate-pulse rounded-lg"
-          ></div>
-        ))}
-      </div>
-    );
-  }
-
-  // Empty
-  if (!images.length) {
-    return (
-      <div className="h-[60vh] flex items-center justify-center flex-col text-gray-600">
-        <p className="text-lg font-medium">No images found for your institution.</p>
-      </div>
-    );
-  }
+export default function AlumniGallery() {
+  const images = useResource(loadImages, []);
+  const [open, setOpen] = useState(null);
+  const rows = images.data || [];
 
   return (
-    <div className="px-4 py-6">
-      <h2 className="text-xl md:text-2xl font-semibold mb-5 text-gray-800">
-        📸 Alumni Event Gallery
-      </h2>
+    <>
+      <PageHeader eyebrow="Community" title="Gallery" description="Moments from your institution's drives, shared by the students serving now." />
+      {images.loading ? (
+        <CardGridSkeleton count={6} />
+      ) : images.status === "error" ? (
+        <ErrorState error={images.error} onRetry={images.reload} />
+      ) : rows.length ? (
+        <ul className="columns-1 gap-4 sm:columns-2 xl:columns-3">
+          {rows.map((img) => (
+            <li key={img.id} className="mb-4 break-inside-avoid">
+              <button type="button" onClick={() => setOpen(img)} className="group block w-full overflow-hidden rounded-lg bg-mist text-left" aria-label={`Open photo from ${img.eventTitle}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- Cloudinary upload shown at natural aspect */}
+                <img src={img.url} alt={img.caption || img.eventTitle} loading="lazy" className="w-full transition-transform duration-700 ease-out-expo group-hover:scale-[1.03]" />
+              </button>
+              <p className="mt-2 flex justify-between gap-3 text-[12.5px]">
+                <span className="truncate font-semibold text-fg">{img.eventTitle}</span>
+                <span className="shrink-0 text-muted">{formatDate(img.eventDate)}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState icon={Images} title="No photos yet" description="When volunteers and teachers upload photos from drives, they appear here." />
+      )}
 
-      {/* Gallery Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {images.map((img, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: index * 0.03 }}
-            className="relative overflow-hidden rounded-xl shadow-md group cursor-pointer"
-            onClick={() => setSelectedIndex(index)}
-          >
-            <img
-              src={img.url}
-              alt={`gallery-img-${index}`}
-              className="w-full h-48 object-cover transition-all duration-500 group-hover:scale-110"
-            />
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Modal Viewer */}
-      <AnimatePresence>
-        {selectedIndex !== null && (
-          <motion.div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center items-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            {/* Close Button */}
-            <button
-              className="absolute top-5 right-5 text-white p-2 bg-black/40 rounded-full hover:bg-black"
-              onClick={() => setSelectedIndex(null)}
-            >
-              <X size={28} />
-            </button>
-
-            {/* Left Arrow */}
-            <button
-              className="absolute left-5 text-white p-2 bg-black/40 rounded-full hover:bg-black"
-              onClick={prevImage}
-            >
-              <ChevronLeft size={32} />
-            </button>
-
-            {/* Image */}
-            <motion.img
-              key={selectedIndex}
-              src={images[selectedIndex].url}
-              className="max-w-[90%] max-h-[80%] rounded-xl shadow-lg select-none"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            />
-
-            {/* Right Arrow */}
-            <button
-              className="absolute right-5 text-white p-2 bg-black/40 rounded-full hover:bg-black"
-              onClick={nextImage}
-            >
-              <ChevronRight size={32} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      <Modal open={Boolean(open)} onClose={() => setOpen(null)} size="xl" title={open?.eventTitle || ""} description={open ? [open.caption, formatDate(open.eventDate)].filter(Boolean).join(" · ") : ""}>
+        {open ? (
+          // eslint-disable-next-line @next/next/no-img-element -- full-size view of an upload
+          <img src={open.url} alt={open.caption || open.eventTitle} className="max-h-[70vh] w-full rounded-lg object-contain" />
+        ) : null}
+      </Modal>
+    </>
   );
-};
-
-export default AlumniGallery;
+}

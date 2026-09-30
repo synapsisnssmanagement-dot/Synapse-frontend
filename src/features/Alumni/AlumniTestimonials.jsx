@@ -1,110 +1,93 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useState } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { Quote, Send } from "lucide-react";
 import { toast } from "sonner";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import api, { errorMessage } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
+import { useAlumniDashboard } from "./data";
 
-const AlumniTestimonials = () => {
+const MIN = 20;
+const MAX = 600;
+
+export default function AlumniTestimonials() {
+  const dashboard = useAlumniDashboard();
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const mine = [...(dashboard.data?.testimonials || [])].reverse();
+  const length = message.trim().length;
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-
-    if (!message.trim()) {
-      return toast.info("Please write your testimonial.");
+    if (length < MIN) {
+      toast.error(`Write at least ${MIN} characters.`);
+      return;
     }
-
+    setSending(true);
     try {
-      setLoading(true);
-      const token = getToken();
-
-      const res = await axios.post(
-        `${API_URL}/api/alumni/testimonial`,
-        { message },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      toast.success(res.data.message);
+      await api.post("/api/alumni/testimonial", { message: message.trim() });
+      toast.success("Submitted. An administrator reviews it before it's published.");
       setMessage("");
+      dashboard.reload();
     } catch (error) {
-      toast.info(error.response?.data?.message || "Something went wrong");
+      toast.error(errorMessage(error, "We couldn't submit your testimonial."));
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-10 min-h-screen bg-gray-50 flex justify-center">
-      <div className="w-full max-w-3xl bg-white shadow-xl rounded-3xl p-6 sm:p-10 border border-gray-100">
-        {/* Title */}
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-2">
-          Share Your Experience ✨
-        </h2>
-        <p className="text-center text-gray-600 mb-8 text-sm sm:text-base px-2">
-          Your testimonial helps inspire future students and alumni.
-        </p>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-gray-800 font-semibold mb-2">
-              Your Testimonial
-            </label>
-
-            <textarea
-              className="
-                w-full
-                h-32 sm:h-40
-                p-4
-                rounded-xl
-                bg-gray-50
-                border border-gray-300
-                focus:outline-none
-                focus:ring-2 focus:ring-green-400
-                focus:border-green-400
-                transition
-                text-gray-800
-                shadow-sm
-                text-sm sm:text-base
-              "
-              placeholder="Write about your experience, achievements or journey..."
+    <>
+      <PageHeader eyebrow="Community" title="Testimonials" description="What did NSS mean to you? Approved reflections appear in the Voices section of the public site." />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <Panel title="Write a testimonial">
+          <form onSubmit={submit} className="space-y-4">
+            <Textarea
+              label="Your reflection"
+              rows={7}
+              maxLength={MAX}
+              placeholder="A moment, a lesson, a person — whatever stayed with you."
+              hint={`${length} / ${MAX} characters`}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              maxLength={400}
-            ></textarea>
-
-            <div className="text-right text-xs sm:text-sm text-gray-500 mt-1">
-              {message.length}/400 characters
+            />
+            <Button type="submit" icon={Send} loading={sending} disabled={length < MIN}>
+              Submit for review
+            </Button>
+          </form>
+        </Panel>
+        <Panel title="Your submissions" bodyClassName="p-0">
+          {dashboard.loading ? (
+            <div className="space-y-4 p-5">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
             </div>
-          </div>
-
-          {/* Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={`
-              w-full py-3 rounded-xl text-white text-lg font-semibold shadow-md
-              transition-transform transform hover:scale-[1.01]
-              ${
-                loading
-                  ? "bg-blue-300 cursor-not-allowed"
-                  : "bg-gradient-to-r from-green-600 to-green-500 hover:opacity-90"
-              }
-            `}
-          >
-            {loading ? "Submitting..." : "Submit Testimonial"}
-          </button>
-        </form>
+          ) : dashboard.status === "error" ? (
+            <ErrorState size="sm" error={dashboard.error} onRetry={dashboard.reload} />
+          ) : mine.length ? (
+            <ul className="divide-y divide-line">
+              {mine.map((t) => (
+                <li key={t._id} className="px-5 py-4">
+                  <p className="font-display text-[1.15rem] leading-snug text-ink">&ldquo;{t.message}&rdquo;</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <StatusBadge status={t.visibility || "pending"} label={t.visibility === "approved" ? "Published" : t.visibility === "rejected" ? "Not published" : "In review"} size="sm" />
+                    {t.createdAt ? <span className="text-[12px] text-subtle">{timeAgo(t.createdAt)}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState size="sm" icon={Quote} title="Nothing submitted yet" description="Your testimonials and their review status will appear here." />
+          )}
+        </Panel>
       </div>
-    </div>
+    </>
   );
-};
-
-export default AlumniTestimonials;
+}

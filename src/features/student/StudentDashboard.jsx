@@ -1,238 +1,159 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "sonner";
-import Calendar from "react-calendar";
-import "react-calendar/dist/Calendar.css";
-import { format, isSameDay, parseISO } from "date-fns";
-import {
-  FaAward,
-  FaClock,
-  FaCalendarAlt,
-  FaCheckCircle,
-  FaMapMarkerAlt,
-  FaUserTie,
-} from "react-icons/fa";
+import Link from "next/link";
+import { Award, CalendarRange, Clock3, MapPin, ScrollText, Trophy } from "lucide-react";
+import { LevelBadge, StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import DateBlock from "@/components/ui/DateBlock";
+import PageHeader, { Accent } from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import Progress from "@/components/ui/Progress";
+import { DashboardSkeleton } from "@/components/ui/Skeleton";
+import StatCard from "@/components/ui/StatCard";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api from "@/lib/api";
+import { firstName, formatNumber, greeting } from "@/lib/format";
+import { levelProgress, sortEvents, useStudentProfile } from "./data";
 
-const StudentDashboard = () => {
-  const [dashboard, setDashboard] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const token = getToken();
+function Journey({ hours }) {
+  const { current, next, pct } = levelProgress(hours);
+  return (
+    <section aria-labelledby="journey-title" className="flex flex-col justify-between rounded-2xl bg-ink p-6 text-on-dark sm:p-7">
+      <div>
+        <p id="journey-title" className="eyebrow text-on-dark/55">
+          Hours credited
+        </p>
+        <p className="tabular mt-5 text-[clamp(3.25rem,6vw,4.75rem)] font-semibold leading-none tracking-[-0.05em] text-brand">
+          {formatNumber(Math.round(hours * 10) / 10)}
+          <span className="ml-2 text-lg font-medium tracking-normal text-on-dark/60">h</span>
+        </p>
+        <div className="mt-4 flex items-center gap-2">
+          {current ? <LevelBadge level={current.name} /> : <span className="text-[13px] text-on-dark/60">No level yet</span>}
+        </div>
+      </div>
+      <div className="mt-8">
+        <Progress
+          dark
+          value={pct}
+          max={100}
+          label={next ? `Next: ${next.name}` : "Highest level reached"}
+          valueLabel={next ? `${Math.max(0, Math.ceil(next.minHours - hours))} h to go` : "Platinum"}
+        />
+        <p className="mt-4 text-[13px] leading-relaxed text-on-dark/55">Hours are credited when an event is completed and you were marked present.</p>
+      </div>
+    </section>
+  );
+}
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/students/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+export default function StudentDashboard() {
+  const dashboard = useResource(() => api.get("/api/students/dashboard").then((res) => res.data?.dashboard || null), []);
+  const profile = useStudentProfile();
 
-        if (res.data.success) {
-          setDashboard(res.data.dashboard);
-        } else {
-          toast.error("Failed to load dashboard");
+  if (dashboard.loading) return <DashboardSkeleton />;
+  if (dashboard.status === "error" || !dashboard.data) {
+    return <ErrorState title="We couldn't load your dashboard" error={dashboard.error} onRetry={dashboard.reload} />;
+  }
+
+  const { student, stats = {}, awards = [], assignedEvents = [] } = dashboard.data;
+  const credited = Number(profile.data?.totalVolunteerHours) || 0;
+  const upcoming = sortEvents(assignedEvents.filter((e) => e.status === "Upcoming" || e.status === "Ongoing")).slice(0, 4);
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={student?.institution?.name || "Volunteer"}
+        title={
+          <>
+            {greeting()}
+            {student?.name ? (
+              <>
+                , <Accent>{firstName(student.name)}</Accent>
+              </>
+            ) : null}
+          </>
         }
-      } catch (err) {
-        toast.error("Error fetching dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboard();
-  }, [token]);
-
-  if (loading) return <div className="text-center mt-10 text-gray-600">Loading...</div>;
-
-  if (!dashboard) return <div className="text-center mt-10 text-red-500">No data available</div>;
-
-  const {
-    student,
-    stats: { totalEvents, completedEvents, totalHours, graceMarks },
-    assignedEvents,
-  } = dashboard;
-
-  const upcomingEvents = assignedEvents.filter(
-    (ev) => new Date(ev.date) >= new Date()
-  );
-
-  const eventsForSelectedDate = upcomingEvents.filter((ev) =>
-    isSameDay(parseISO(ev.date), selectedDate)
-  );
-
-  return (
-    <div className="p-4 sm:p-6 bg-gradient-to-br from-emerald-50 via-white to-green-100 min-h-screen">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 
-        bg-white/80 backdrop-blur-md border border-emerald-100 shadow-lg 
-        rounded-2xl p-5 sm:p-6 gap-4">
-        
-        <div className="w-full sm:w-auto">
-          <h1 className="text-3xl sm:text-4xl font-extrabold 
-            bg-gradient-to-r from-emerald-600 to-green-700 
-            bg-clip-text text-transparent">
-            Welcome, {student.name}
-          </h1>
-
-          <p className="text-gray-600 text-sm mt-1 break-all">
-            Department of <span className="font-medium">{student.department}</span> | {student.email}
-          </p>
-
-          {student.institution && (
-            <p className="text-gray-500 text-sm mt-1 italic">
-              {student.institution.name}, {student.institution.address}
-            </p>
-          )}
-        </div>
-
-        {student.profileImage && (
-          <img
-            src={student.profileImage}
-            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-emerald-400 
-            shadow-lg object-cover"
-          />
-        )}
-      </div>
-
-      {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 mb-10">
-        <StatCard icon={<FaCalendarAlt />} color="emerald" title="Total Events" value={totalEvents} />
-        <StatCard icon={<FaCheckCircle />} color="green" title="Completed" value={completedEvents} />
-        <StatCard icon={<FaClock />} color="teal" title="Total Hours" value={totalHours} />
-        <StatCard icon={<FaAward />} color="yellow" title="Grace Marks" value={graceMarks} />
-      </div>
-
-      {/* CALENDAR + EVENTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-        {/* CALENDAR */}
-        <div className="bg-white/90 rounded-2xl shadow-lg border border-emerald-100 p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold text-emerald-700 mb-4 flex items-center gap-2">
-            <FaCalendarAlt /> Upcoming Events
-          </h2>
-
-          <CustomStyledCalendar
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-            upcomingEvents={upcomingEvents}
-          />
-        </div>
-
-        {/* EVENTS FOR SELECTED DATE */}
-        <div className="bg-white/90 rounded-2xl shadow-lg border border-emerald-100 p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold text-emerald-700 mb-4 flex items-center gap-2">
-            <FaClock /> Events on {format(selectedDate, "MMMM dd, yyyy")}
-          </h2>
-
-          {eventsForSelectedDate.length > 0 ? (
-            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-300">
-              {eventsForSelectedDate.map((ev) => (
-                <EventItem key={ev.id} ev={ev} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-sm italic">No events on this date.</p>
-          )}
-        </div>
-      </div>
-
-      {/* ALL ASSIGNED EVENTS */}
-      <div className="bg-white/90 rounded-2xl shadow-lg border border-emerald-100 p-4 sm:p-6">
-        <h2 className="text-lg sm:text-xl font-semibold text-emerald-700 mb-4 flex items-center gap-2">
-          <FaUserTie /> All Assigned Events
-        </h2>
-
-        {assignedEvents.length > 0 ? (
-          <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-green-300">
-            {assignedEvents.map((ev) => (
-              <EventItem key={ev.id} ev={ev} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-sm italic">No assigned events yet.</p>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const EventItem = ({ ev }) => (
-  <div className="border border-emerald-100 rounded-xl p-4 hover:bg-emerald-50 transition shadow-sm">
-    <div className="flex justify-between items-start gap-3">
-      <div className="min-w-0">
-        <p className="font-semibold text-gray-800 text-sm sm:text-base truncate">{ev.title}</p>
-
-        <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
-          <FaCalendarAlt className="text-emerald-600" />
-          {ev.date?.slice(0, 10)}
-        </p>
-
-        <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
-          <FaMapMarkerAlt className="text-emerald-600" />
-          {ev.location}
-        </p>
-
-        <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
-          <FaUserTie className="text-emerald-600" />
-          {ev.teacher}
-        </p>
-      </div>
-
-      <span
-        className={`
-          px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold
-          ${
-            ev.status === "Completed"
-              ? "bg-emerald-100 text-emerald-700"
-              : ev.status === "Ongoing"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-gray-100 text-gray-700"
-          }
-        `}
-      >
-        {ev.status}
-      </span>
-    </div>
-  </div>
-);
-
-const CustomStyledCalendar = ({ selectedDate, setSelectedDate, upcomingEvents }) => {
-  return (
-    <div className="[&_.react-calendar]:border-none [&_.react-calendar]:w-full">
-      <Calendar
-        onChange={setSelectedDate}
-        value={selectedDate}
-        className="rounded-xl bg-white p-3 sm:p-4 shadow-inner text-gray-700"
-        tileContent={({ date }) =>
-          upcomingEvents.some((ev) => isSameDay(parseISO(ev.date), date)) ? (
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mx-auto mt-1"></div>
-          ) : null
+        description="What you've done, what's next, and how far you've come."
+        actions={
+          <Button href="/studentlayout/studentevents" icon={CalendarRange}>
+            My events
+          </Button>
         }
       />
-    </div>
-  );
-};
 
-const StatCard = ({ icon, color, title, value }) => {
-  const gradients = {
-    emerald: "from-emerald-500 to-green-600",
-    green: "from-green-500 to-lime-600",
-    teal: "from-teal-500 to-cyan-600",
-    yellow: "from-yellow-400 to-amber-500",
-  };
-
-  return (
-    <div className={`p-4 sm:p-5 rounded-2xl shadow-lg bg-gradient-to-br ${gradients[color]} 
-      text-white flex items-center gap-4 hover:scale-[1.02] transition-transform`}>
-      <div className="text-3xl">{icon}</div>
-      <div>
-        <p className="text-xs sm:text-sm opacity-90">{title}</p>
-        <p className="text-xl sm:text-2xl font-bold">{value}</p>
+      <div className="grid gap-4 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <Journey hours={credited} />
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:col-span-7">
+          <StatCard align="bottom" label="Events joined" value={stats.totalEvents || 0} icon={CalendarRange} />
+          <StatCard align="bottom" label="Completed" value={stats.completedEvents || 0} icon={Trophy} variant="mint" />
+          <StatCard align="bottom" label="Planned hours" value={stats.totalHours || 0} unit="h" icon={Clock3} footnote="Across all your events" />
+          <StatCard align="bottom" label="Grace marks" value={stats.graceMarks || 0} icon={Award} />
+        </div>
       </div>
-    </div>
-  );
-};
 
-export default StudentDashboard;
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <Panel
+          title="What's next"
+          description="Your upcoming and live events"
+          bodyClassName="p-0"
+          actions={
+            <Link href="/studentlayout/studentevents" className="link-draw text-[13px] font-semibold text-fg-2 hover:text-ink">
+              All events
+            </Link>
+          }
+        >
+          {upcoming.length ? (
+            <ul className="divide-y divide-line">
+              {upcoming.map((event) => (
+                <li key={event.id} className="flex items-center gap-4 px-5 py-4">
+                  <DateBlock date={event.date} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-[14.5px] font-semibold text-fg">{event.title}</p>
+                      {event.status === "Ongoing" ? <StatusBadge status="ongoing" label="Live" size="sm" /> : null}
+                    </div>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[13px] text-muted">
+                      <span className="flex items-center gap-1.5">
+                        <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
+                      </span>
+                      <span>{event.hours} h</span>
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState size="sm" icon={CalendarRange} title="Nothing scheduled" description="When a coordinator adds you to an event, it shows up here." />
+          )}
+        </Panel>
+
+        <Panel title="Recognition" description="Awards you've earned" bodyClassName="p-0">
+          {awards.length ? (
+            <ul className="divide-y divide-line">
+              {awards.slice(0, 6).map((award, i) => (
+                <li key={`${award.title || award.name}-${i}`} className="flex items-start gap-3 px-5 py-3.5">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-mint text-brand-700">
+                    <Award aria-hidden="true" className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold text-fg">{award.title || award.name}</span>
+                    {award.description ? <span className="block text-[12.5px] text-muted">{award.description}</span> : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState size="sm" icon={Trophy} title="No awards yet" description="Awards appear as your hours grow." />
+          )}
+          <div className="border-t border-line p-3">
+            <Button href="/studentlayout/certificates" variant="ghost" size="sm" icon={ScrollText} fullWidth>
+              View certificates
+            </Button>
+          </div>
+        </Panel>
+      </div>
+    </>
+  );
+}

@@ -1,190 +1,89 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { motion } from "framer-motion";
-import {
-  FaCertificate,
-  FaCalendarAlt,
-  FaMapMarkerAlt,
-  FaClock,
-  FaLeaf,
-} from "react-icons/fa";
+import { useState } from "react";
+import { Download, MapPin, ScrollText } from "lucide-react";
+import { toast } from "sonner";
+import { LogoMark } from "@/components/brand/Logo";
+import Button from "@/components/ui/Button";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import api, { errorMessage } from "@/lib/api";
+import { formatDate } from "@/lib/format";
+import { sortEvents, useMyEvents } from "./data";
 
-const StudentCertificate = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function StudentCertificate() {
+  const events = useMyEvents();
   const [downloadingId, setDownloadingId] = useState(null);
+  const completed = sortEvents((events.data || []).filter((e) => e.status === "Completed"));
 
-  useEffect(() => {
-    const fetchMyEvents = async () => {
-      try {
-        const token = getToken();
-        const res = await axios.get(
-          `${API_URL}/api/students/my-events`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setEvents(res.data.events || []);
-      } catch (err) {
-        console.error("Error fetching student events:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMyEvents();
-  }, []);
-
-  const handleGenerateCertificate = async (eventId) => {
+  const download = async (event) => {
+    setDownloadingId(event._id);
     try {
-      setDownloadingId(eventId);
-      const token = getToken();
-
-      const response = await axios.get(
-        `${API_URL}/api/students/generate/${eventId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const res = await api.get(`/api/students/generate/${event._id}`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `certificate_${eventId}.pdf`);
+      link.download = `NSS_Certificate_${event.title.replace(/[^\w\- ]+/g, "").trim() || "event"}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err) {
-      console.error("Certificate generation failed:", err);
-      alert("Unable to generate certificate. Please ensure the event is completed.");
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      let message = "We couldn't generate that certificate.";
+      if (error.response?.data instanceof Blob) {
+        try {
+          message = JSON.parse(await error.response.data.text()).message || message;
+        } catch {
+          // Keep the default message.
+        }
+      } else {
+        message = errorMessage(error, message);
+      }
+      toast.error(message);
     } finally {
       setDownloadingId(null);
     }
   };
 
-  // Loading UI
-  if (loading) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-[70vh] p-4 text-emerald-600 text-lg font-semibold">
-        <FaLeaf className="animate-spin text-3xl mb-2" />
-        <p className="text-center text-sm sm:text-base">
-          Loading your achievements...
-        </p>
-      </div>
-    );
-  }
-
-  const completedEvents = events.filter((e) => e.status === "Completed");
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-100 p-4 sm:p-8">
-      <motion.h1
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="
-          text-2xl sm:text-4xl font-extrabold text-center text-emerald-700 mb-6 sm:mb-10 
-          flex justify-center items-center gap-2 sm:gap-3
-        "
-      >
-        {/* <FaCertificate className="text-emerald-600 text-xl sm:text-3xl" /> */}
-        My Certificates
-      </motion.h1>
-
-      {completedEvents.length === 0 ? (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center text-gray-600 text-sm sm:text-lg px-4"
-        >
-          No completed events yet. Participate in NSS activities to earn
-          certificates 🌿
-        </motion.p>
-      ) : (
-        <div
-          className="
-            grid grid-cols-1 
-            sm:grid-cols-2 
-            xl:grid-cols-3 
-            gap-4 sm:gap-6 lg:gap-8
-          "
-        >
-          {completedEvents.map((event, index) => (
-            <motion.div
-              key={event._id}
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="
-                bg-white/80 backdrop-blur-md shadow-lg 
-                rounded-2xl p-4 sm:p-6 
-                border border-emerald-200 
-                hover:shadow-2xl 
-                hover:scale-[1.02] 
-                transition-all duration-300
-              "
-            >
-              {/* Title */}
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h2
-                  className="
-                    text-lg sm:text-xl font-bold text-emerald-800 
-                    max-w-[75%] truncate
-                  "
-                >
-                  {event.title}
-                </h2>
-                {/* <FaLeaf className="text-emerald-500 text-base sm:text-lg" /> */}
+    <>
+      <PageHeader eyebrow="Recognition" title="Certificates" description="A signed certificate for every completed event you took part in." />
+      {events.loading ? (
+        <CardGridSkeleton count={3} />
+      ) : events.status === "error" ? (
+        <ErrorState error={events.error} onRetry={events.reload} />
+      ) : completed.length ? (
+        <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {completed.map((event) => (
+            <li key={event._id} className="flex flex-col overflow-hidden rounded-xl border border-line bg-paper">
+              <div className="relative flex aspect-[1.414/1] flex-col justify-between border-b border-line bg-canvas p-6">
+                <div aria-hidden="true" className="absolute inset-3 rounded-sm border border-ink/15" />
+                <div className="relative flex items-center justify-between">
+                  <LogoMark className="size-7 text-ink" />
+                  <span className="eyebrow text-[0.6rem] text-muted">Certificate of service</span>
+                </div>
+                <div className="relative">
+                  <p className="font-display text-2xl leading-tight text-ink">{event.title}</p>
+                  <p className="mt-2 text-[12.5px] text-muted">
+                    {formatDate(event.date, "long")} · {event.calculatedHours || event.hours} hours
+                  </p>
+                </div>
               </div>
-
-              {/* Event Info */}
-              <div className="space-y-2 text-gray-700 text-xs sm:text-sm">
-                <p className="flex items-center gap-2">
-                  <FaCalendarAlt className="text-emerald-600" />
-                  {new Date(event.date).toLocaleDateString()}
-                </p>
-                <p className="flex items-center gap-2">
-                  <FaMapMarkerAlt className="text-emerald-600" />
-                  {event.location || "N/A"}
-                </p>
-                <p className="flex items-center gap-2">
-                  <FaClock className="text-emerald-600" />
-                  {event.hours} hrs
-                </p>
+              <div className="flex items-center justify-between gap-3 p-4">
+                <span className="flex min-w-0 items-center gap-1.5 truncate text-[13px] text-muted">
+                  <MapPin aria-hidden="true" className="size-3.5 shrink-0" /> {event.location || "—"}
+                </span>
+                <Button size="sm" icon={Download} loading={downloadingId === event._id} onClick={() => download(event)}>
+                  Download
+                </Button>
               </div>
-
-              {/* Download Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleGenerateCertificate(event._id)}
-                disabled={downloadingId === event._id}
-                className={`
-                  w-full mt-4 sm:mt-5 
-                  flex justify-center items-center gap-2 
-                  py-2.5 rounded-lg 
-                  font-semibold text-white shadow-md transition-all 
-                  text-sm sm:text-base
-                  ${
-                    downloadingId === event._id
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-gradient-to-r from-emerald-600 to-green-500 hover:from-green-600 hover:to-emerald-700"
-                  }
-                `}
-              >
-                <FaCertificate className="text-white" />
-                {downloadingId === event._id ? "Generating..." : "Download Certificate"}
-              </motion.button>
-            </motion.div>
+            </li>
           ))}
-        </div>
+        </ul>
+      ) : (
+        <EmptyState icon={ScrollText} title="No certificates yet" description="Certificates become available once an event you attended is completed." />
       )}
-    </div>
+    </>
   );
-};
-
-export default StudentCertificate;
+}

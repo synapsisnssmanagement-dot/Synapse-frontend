@@ -7,6 +7,19 @@ export function getToken() {
   return localStorage.getItem("token");
 }
 
+// Reads the user id from the JWT payload. Display-only (e.g. "is this my
+// message?"); the server never trusts it.
+export function getUserId() {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.id ? String(payload.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getRole() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("role");

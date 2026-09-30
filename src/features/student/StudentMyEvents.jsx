@@ -1,305 +1,137 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  FaCalendarAlt,
-  FaMapMarkerAlt,
-  FaClock,
-  FaSyncAlt,
-  FaUserTie,
-  FaUserShield,
-  FaSchool,
-  FaInfoCircle,
-  FaBookReader,
-  FaPhoneAlt,
-  FaBuilding,
-} from "react-icons/fa";
-import { toast } from "sonner";
+import { useId, useMemo, useState } from "react";
+import { CalendarDays, CalendarRange, Clock3, MapPin } from "lucide-react";
+import { StatusBadge } from "@/components/ui/Badge";
+import { SearchInput } from "@/components/ui/DataTable";
+import DateBlock from "@/components/ui/DateBlock";
+import { Drawer } from "@/components/ui/Dialog";
+import Identity from "@/components/ui/Identity";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
+import useResource from "@/hooks/useResource";
+import api from "@/lib/api";
+import { formatDate } from "@/lib/format";
+import { sortEvents } from "./data";
 
-const StudentMyEvents = () => {
-  const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const token = getToken();
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "Upcoming", label: "Upcoming" },
+  { id: "Ongoing", label: "Live" },
+  { id: "Completed", label: "Completed" },
+];
 
-  // Fetch Events
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${API_URL}/api/students/events/filter`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = res.data?.events || [];
-      setEvents(data);
-      setFilteredEvents(data);
-      setLoading(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to fetch events");
-      setLoading(false);
-    }
-  };
+const asList = (value) => (Array.isArray(value) ? value : value ? [value] : []);
 
-  // Filter by Status
-  const handleFilterChange = (e) => {
-    const value = e.target.value;
-    setStatusFilter(value);
-    if (value === "All") setFilteredEvents(events);
-    else setFilteredEvents(events.filter((ev) => ev.status === value));
-  };
+export default function StudentMyEvents() {
+  const tabsId = useId();
+  const events = useResource(() => api.get("/api/students/events/filter").then((res) => res.data?.events || []), []);
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [openId, setOpenId] = useState(null);
 
-  // Initial Fetch
-  useEffect(() => {
-    fetchEvents();
-  }, []);
+  const all = useMemo(() => events.data || [], [events.data]);
+  const counts = useMemo(() => {
+    const out = { all: all.length, Upcoming: 0, Ongoing: 0, Completed: 0 };
+    all.forEach((e) => {
+      if (out[e.status] != null) out[e.status] += 1;
+    });
+    return out;
+  }, [all]);
 
-  // Hide Scrollbar when Modal Open
-  useEffect(() => {
-    if (selectedEvent) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-    return () => (document.body.style.overflow = "auto");
-  }, [selectedEvent]);
+  const q = query.trim().toLowerCase();
+  const rows = sortEvents(all.filter((e) => (filter === "all" || e.status === filter) && (!q || `${e.title} ${e.location}`.toLowerCase().includes(q))));
+  const open = all.find((e) => e.id === openId) || null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 p-4 sm:p-6 lg:p-10">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-green-800 drop-shadow-sm tracking-tight text-center sm:text-left">
-           My NSS Events
-        </h1>
+    <>
+      <PageHeader eyebrow="Service" title="My events" description="Every drive you've been part of, and the ones coming up." />
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-center sm:justify-end">
-          <select
-            value={statusFilter}
-            onChange={handleFilterChange}
-            className="border border-green-400 bg-white/70 backdrop-blur-md rounded-xl px-3 sm:px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-1/2 sm:w-auto"
-          >
-            <option value="All">All</option>
-            <option value="Upcoming">Upcoming</option>
-            <option value="Ongoing">Ongoing</option>
-            <option value="Completed">Completed</option>
-          </select>
-
-          <button
-            onClick={fetchEvents}
-            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-xl shadow-md flex items-center gap-2 text-sm sm:text-base"
-          >
-            <FaSyncAlt className="animate-spin-slow" /> Refresh
-          </button>
-        </div>
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <Tabs id={tabsId} value={filter} onChange={setFilter} label="Filter events" tabs={FILTERS.map((f) => ({ ...f, count: counts[f.id] }))} className="flex-1" />
+        <SearchInput value={query} onChange={setQuery} placeholder="Search events" className="w-full lg:w-72" />
       </div>
 
-      {/* Loading / Empty */}
-      {loading ? (
-        <div className="text-center text-gray-500 mt-16 animate-pulse text-lg">
-          Loading your events...
-        </div>
-      ) : filteredEvents.length === 0 ? (
-        <div className="text-center text-gray-500 mt-16 text-lg">
-          No events found for this filter.
-        </div>
-      ) : (
-        <motion.div
-          layout
-          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 sm:gap-8"
-        >
-          {filteredEvents.map((event) => (
-            <motion.div
-              key={event._id || event.id || Math.random()}
-              whileHover={{ scale: 1.03 }}
-              onClick={() => setSelectedEvent(event)}
-              className="cursor-pointer bg-white/70 backdrop-blur-lg shadow-lg border border-green-100 rounded-3xl p-5 sm:p-6 transition-all hover:shadow-green-300 hover:border-green-300"
-            >
-              <h2 className="text-xl sm:text-2xl font-bold text-green-700 mb-2">
-                {event.title}
-              </h2>
-              <p className="text-gray-600 text-sm sm:text-base mb-4 line-clamp-2">
-                {event.description}
-              </p>
-
-              <div className="space-y-2 text-sm sm:text-base text-gray-700">
-                <div className="flex items-center gap-2">
-                  <FaCalendarAlt className="text-green-600 flex-shrink-0" />
-                  {new Date(event.date).toLocaleDateString()}
-                </div>
-                <div className="flex items-center gap-2">
-                  <FaMapMarkerAlt className="text-green-600 flex-shrink-0" />{" "}
-                  {event.location}
-                </div>
-                <div className="flex items-center gap-2">
-                  <FaClock className="text-green-600 flex-shrink-0" />{" "}
-                  {event.hours} hrs
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-between items-center">
-                <span
-                  className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-full ${
-                    event.status === "Completed"
-                      ? "bg-green-100 text-green-700"
-                      : event.status === "Ongoing"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-blue-100 text-blue-700"
-                  }`}
+      <div {...tabPanelProps(tabsId, filter)}>
+        {events.loading ? (
+          <CardGridSkeleton count={4} />
+        ) : events.status === "error" ? (
+          <ErrorState error={events.error} onRetry={events.reload} />
+        ) : rows.length ? (
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {rows.map((event) => (
+              <li key={event.id}>
+                <button
+                  type="button"
+                  onClick={() => setOpenId(event.id)}
+                  className="flex h-full w-full flex-col rounded-xl border border-line bg-paper p-5 text-left transition-colors hover:border-ink"
                 >
-                  {event.status}
-                </span>
-                <FaInfoCircle className="text-green-600 text-base sm:text-lg" />
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Modal */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <motion.div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl p-6 sm:p-8 relative overflow-hidden"
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-            >
-              <button
-                onClick={() => setSelectedEvent(null)}
-                className="absolute top-3 right-5 text-gray-500 hover:text-red-500 text-2xl font-bold"
-              >
-                ×
-              </button>
-
-              <div className="space-y-6 overflow-y-auto max-h-[80vh] pr-2">
-                {/* Title & Desc */}
-                <div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-green-700">
-                    {selectedEvent.title}
-                  </h2>
-                  <p className="text-gray-600 mt-2 text-sm sm:text-base">
-                    {selectedEvent.description}
-                  </p>
-                </div>
-
-                {/* Event Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700">
-                  <div className="flex items-center gap-2">
-                    <FaCalendarAlt className="text-green-600" />
-                    <span>{new Date(selectedEvent.date).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FaMapMarkerAlt className="text-green-600" />
-                    <span>{selectedEvent.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FaClock className="text-green-600" />
-                    <span>{selectedEvent.hours} hours</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FaBookReader className="text-green-600" />
-                    <span>Status: {selectedEvent.status}</span>
-                  </div>
-                </div>
-
-                <hr className="my-4 border-green-200" />
-
-                {/* Teachers */}
-                <div>
-                  <h3 className="font-semibold text-green-700 flex items-center gap-2 text-lg">
-                    <FaUserTie /> Teacher(s)
-                  </h3>
-                  {Array.isArray(selectedEvent.teacher) &&
-                  selectedEvent.teacher.length > 0 ? (
-                    selectedEvent.teacher.map((t, idx) => (
-                      <div
-                        key={idx}
-                        className="ml-4 sm:ml-6 bg-green-50/60 rounded-lg p-2 mt-2 text-sm"
-                      >
-                        <p className="font-medium">{t.name}</p>
-                        <p className="text-gray-500">{t.email}</p>
-                        {t.phoneNumber && (
-                          <p className="text-gray-500 flex items-center gap-1">
-                            <FaPhoneAlt className="text-green-500" /> {t.phoneNumber}
-                          </p>
-                        )}
-                        {t.department && (
-                          <p className="text-gray-500 flex items-center gap-1">
-                            <FaBuilding className="text-green-500" /> {t.department}
-                          </p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="ml-6 text-gray-500 text-sm">No teacher assigned</p>
-                  )}
-                </div>
-
-                {/* Coordinator */}
-                <div>
-                  <h3 className="font-semibold text-green-700 flex items-center gap-2 text-lg mt-4">
-                    <FaUserShield /> Coordinator
-                  </h3>
-                  {selectedEvent.coordinator ? (
-                    <div className="ml-4 sm:ml-6 bg-green-50/60 rounded-lg p-2 mt-2 text-sm">
-                      <p className="font-medium">{selectedEvent.coordinator.name}</p>
-                      <p className="text-gray-500">{selectedEvent.coordinator.email}</p>
-                      {selectedEvent.coordinator.phoneNumber && (
-                        <p className="text-gray-500 flex items-center gap-1">
-                          <FaPhoneAlt className="text-green-500" />{" "}
-                          {selectedEvent.coordinator.phoneNumber}
-                        </p>
-                      )}
-                      {selectedEvent.coordinator.department && (
-                        <p className="text-gray-500 flex items-center gap-1">
-                          <FaBuilding className="text-green-500" />{" "}
-                          {selectedEvent.coordinator.department}
-                        </p>
-                      )}
+                  <div className="flex items-start gap-3">
+                    <DateBlock date={event.date} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+                      <p className="mt-2 text-[15px] font-semibold leading-snug text-fg">{event.title}</p>
                     </div>
-                  ) : (
-                    <p className="ml-6 text-gray-500 text-sm">
-                      No coordinator assigned
-                    </p>
-                  )}
-                </div>
-
-                {/* Institution */}
-                <div>
-                  <h3 className="font-semibold text-green-700 flex items-center gap-2 text-lg mt-4">
-                    <FaSchool /> Institution
-                  </h3>
-                  {selectedEvent.institution ? (
-                    <div className="ml-4 sm:ml-6 bg-green-50/60 rounded-lg p-2 mt-2 text-sm">
-                      <p className="font-medium">
-                        {selectedEvent.institution.name}
-                      </p>
-                      <p className="text-gray-500">
-                        {selectedEvent.institution.address}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="ml-6 text-gray-500 text-sm">No institution details</p>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+                  </div>
+                  <ul className="mt-4 space-y-1.5 text-[13px] text-muted">
+                    <li className="flex items-center gap-2">
+                      <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Clock3 aria-hidden="true" className="size-3.5" /> {event.hours} hours
+                    </li>
+                  </ul>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            icon={CalendarRange}
+            title={q ? "No matches" : "No events here"}
+            description={q ? "Try a different name or place." : "When a coordinator adds you to a drive, it appears here."}
+          />
         )}
-      </AnimatePresence>
-    </div>
-  );
-};
+      </div>
 
-export default StudentMyEvents;
+      <Drawer open={Boolean(open)} onClose={() => setOpenId(null)} eyebrow="Event" title={open?.title || ""} size="lg">
+        {open ? (
+          <div className="space-y-8">
+            <StatusBadge status={open.status} label={open.status === "Ongoing" ? "Live" : undefined} />
+            <ul className="space-y-2.5 text-[14.5px] text-fg-2">
+              <li className="flex items-center gap-3">
+                <CalendarDays aria-hidden="true" className="size-4 text-subtle" /> {formatDate(open.date, "long")}
+              </li>
+              <li className="flex items-center gap-3">
+                <MapPin aria-hidden="true" className="size-4 text-subtle" /> {open.location || "No location"}
+              </li>
+              <li className="flex items-center gap-3">
+                <Clock3 aria-hidden="true" className="size-4 text-subtle" /> {open.hours} hours planned
+              </li>
+            </ul>
+            {open.description ? <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg-2">{open.description}</p> : null}
+            {[
+              ["Teachers", asList(open.teacher)],
+              ["Coordinator", asList(open.coordinator)],
+            ].map(([label, people]) =>
+              people.length ? (
+                <section key={label}>
+                  <h3 className="eyebrow mb-3 text-muted">{label}</h3>
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {people.map((p) => (
+                      <li key={p.id} className="rounded-lg border border-line p-3">
+                        <Identity name={p.name} email={p.email} />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null
+            )}
+          </div>
+        ) : null}
+      </Drawer>
+    </>
+  );
+}

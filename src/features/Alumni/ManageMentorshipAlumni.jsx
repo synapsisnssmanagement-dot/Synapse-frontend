@@ -1,274 +1,180 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useId, useState } from "react";
+import { Check, Link2, MessageCircle, Play, Square, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import Avatar from "@/components/ui/Avatar";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { ConfirmDialog, Modal } from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
+import api, { errorMessage } from "@/lib/api";
+import { formatDate, photoOf } from "@/lib/format";
+import { useMentees } from "./data";
 
-const ManageMentorshipAlumni = () => {
-  const [requests, setRequests] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [meetingLink, setMeetingLink] = useState("");
-  const [currentId, setCurrentId] = useState(null);
+const FILTERS = [
+  { id: "pending", label: "Requests" },
+  { id: "active", label: "Active" },
+  { id: "completed", label: "Completed" },
+  { id: "all", label: "All" },
+];
 
-  const token = getToken();
+export default function ManageMentorshipAlumni() {
+  const tabsId = useId();
+  const requests = useMentees();
+  const [filter, setFilter] = useState("pending");
+  const [busy, setBusy] = useState(null);
+  const [ending, setEnding] = useState(null);
+  const [linkFor, setLinkFor] = useState(null);
+  const [link, setLink] = useState("");
 
-  const fetchRequests = async () => {
+  const all = requests.data || [];
+  const counts = { all: all.length };
+  all.forEach((r) => {
+    counts[r.status] = (counts[r.status] || 0) + 1;
+  });
+  const rows = filter === "all" ? all : all.filter((r) => r.status === filter);
+
+  const patch = (id, changes) => requests.mutate((list) => (list || []).map((r) => (r._id === id ? { ...r, ...changes } : r)));
+
+  const act = async (r, action, body, changes, success, key = action) => {
+    setBusy(`${r._id}:${key}`);
     try {
-      const res = await axios.get(`${API_URL}/api/mentorship/mentor`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setRequests(res.data.requests || []);
-    } catch {
-      toast.error("Failed to load mentorship requests");
+      await api.put(`/api/mentorship/${r._id}/${action}`, body);
+      patch(r._id, changes);
+      toast.success(success);
+      return true;
+    } catch (error) {
+      toast.error(errorMessage(error, "That didn't work. Please try again."));
+      return false;
+    } finally {
+      setBusy(null);
     }
   };
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
-
-  const respond = async (id, status) => {
-    try {
-      await axios.put(
-        `${API_URL}/api/mentorship/${id}/respond`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success(`Request ${status}`);
-      fetchRequests();
-    } catch {
-      toast.error("Failed to update request");
+  const saveLink = async (e) => {
+    e.preventDefault();
+    const value = link.trim();
+    if (!/^https?:\/\//i.test(value)) {
+      toast.error("Enter a full link starting with https://");
+      return;
     }
+    if (await act(linkFor, "meeting-link", { link: value }, { meetingLink: value }, "Meeting link shared.")) setLinkFor(null);
   };
-
-  const startSession = async (id) => {
-    try {
-      await axios.put(
-        `${API_URL}/api/mentorship/${id}/start`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success("Session started");
-      fetchRequests();
-    } catch {
-      toast.error("Failed to start session");
-    }
-  };
-
-  const endSession = async (id) => {
-    try {
-      await axios.put(
-        `${API_URL}/api/mentorship/${id}/end`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success("Session ended");
-      fetchRequests();
-    } catch {
-      toast.error("Failed to end session");
-    }
-  };
-
-  const openModal = (id, link) => {
-    setCurrentId(id);
-    setMeetingLink(link || "");
-    setShowModal(true);
-  };
-
-  const saveMeetingLink = async () => {
-    if (!meetingLink.trim()) return toast.error("Please enter a valid link");
-
-    try {
-      await axios.put(
-        `${API_URL}/api/mentorship/${currentId}/meeting-link`,
-        { link: meetingLink },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success("Meeting link saved!");
-      setShowModal(false);
-      fetchRequests();
-    } catch {
-      toast.error("Failed to update meeting link");
-    }
-  };
-
-  const total = requests.length;
-  const pending = requests.filter((r) => r.status === "pending").length;
-  const completed = requests.filter((r) => r.status === "completed").length;
 
   return (
-    <div className="w-full p-4 sm:p-8 md:p-10 min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
+    <>
+      <PageHeader eyebrow="Mentorship" title="Mentees" description="Accept requests, run sessions, and share a meeting link when you're ready to talk." />
+      <Tabs id={tabsId} label="Filter mentorships" className="mb-5" value={filter} onChange={setFilter} tabs={FILTERS.map((f) => ({ ...f, count: counts[f.id] || 0 }))} />
 
-      {/* HEADER */}
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-800 mb-8 sm:mb-12 tracking-tight drop-shadow-sm text-center md:text-left">
-        Manage Mentorships
-      </h1>
-
-      {/* STATS SECTION */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-16">
-
-        <div className="p-6 rounded-3xl shadow-xl bg-white/70 backdrop-blur-lg border border-white/40 hover:shadow-2xl transition-all">
-          <p className="text-gray-500 text-sm">Total Requests</p>
-          <h2 className="text-5xl sm:text-6xl font-black text-emerald-600 mt-2">{total}</h2>
-        </div>
-
-        <div className="p-6 rounded-3xl shadow-xl bg-yellow-50 border border-yellow-200 hover:shadow-2xl transition-all">
-          <p className="text-gray-700 text-sm">Pending</p>
-          <h2 className="text-5xl sm:text-6xl font-black text-yellow-500 mt-2">{pending}</h2>
-        </div>
-
-        <div className="p-6 rounded-3xl shadow-xl bg-green-50 border border-green-200 hover:shadow-2xl transition-all">
-          <p className="text-gray-700 text-sm">Completed</p>
-          <h2 className="text-5xl sm:text-6xl font-black text-green-600 mt-2">{completed}</h2>
-        </div>
-
+      <div {...tabPanelProps(tabsId, filter)}>
+        {requests.loading ? (
+          <CardGridSkeleton count={4} className="xl:grid-cols-2" />
+        ) : requests.status === "error" ? (
+          <ErrorState error={requests.error} onRetry={requests.reload} />
+        ) : rows.length ? (
+          <ul className="grid gap-4 xl:grid-cols-2">
+            {rows.map((r) => (
+              <li key={r._id} className="flex flex-col rounded-xl border border-line bg-paper p-5">
+                <div className="flex items-start gap-3">
+                  <Avatar src={photoOf(r.mentee)} name={r.mentee?.name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-semibold text-fg">{r.mentee?.name || "Student"}</p>
+                    <p className="truncate text-[13px] text-muted">{r.mentee?.department || r.mentee?.email}</p>
+                  </div>
+                  <StatusBadge status={r.status} />
+                </div>
+                <p className="mt-4 text-[15px] font-semibold text-fg">{r.topic}</p>
+                {r.description ? <p className="mt-1 text-[14px] leading-relaxed text-fg-2">{r.description}</p> : null}
+                <p className="mt-3 text-[12.5px] text-subtle">Requested {formatDate(r.requestDate || r.createdAt)}</p>
+                {r.meetingLink ? (
+                  <a href={r.meetingLink} target="_blank" rel="noopener noreferrer" className="link-draw mt-2 truncate text-[13px] font-semibold text-brand-700">
+                    {r.meetingLink}
+                  </a>
+                ) : null}
+                <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                  {r.status === "pending" ? (
+                    <>
+                      <Button size="sm" variant="danger-soft" icon={X} loading={busy === `${r._id}:respond-no`} onClick={() => act(r, "respond", { status: "rejected" }, { status: "rejected" }, "Request declined.", "respond-no")}>
+                        Decline
+                      </Button>
+                      <Button size="sm" icon={Check} loading={busy === `${r._id}:respond`} onClick={() => act(r, "respond", { status: "active" }, { status: "active" }, `You're now mentoring ${r.mentee?.name || "this student"}.`)}>
+                        Accept
+                      </Button>
+                    </>
+                  ) : null}
+                  {r.status === "active" ? (
+                    <>
+                      <Button href={`/alumnilayout/mentorshipchatlayout/mentorshipchat/${r._id}`} size="sm" icon={MessageCircle}>
+                        Chat
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={Link2}
+                        onClick={() => {
+                          setLinkFor(r);
+                          setLink(r.meetingLink || "");
+                        }}
+                      >
+                        {r.meetingLink ? "Change link" : "Share link"}
+                      </Button>
+                      {!r.startDate ? (
+                        <Button size="sm" variant="ghost" icon={Play} loading={busy === `${r._id}:start`} onClick={() => act(r, "start", {}, { startDate: new Date().toISOString() }, "Session started.")}>
+                          Start
+                        </Button>
+                      ) : null}
+                      <Button size="sm" variant="ghost" icon={Square} onClick={() => setEnding(r)}>
+                        End mentorship
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState icon={Users} title={filter === "pending" ? "No new requests" : `No ${filter === "all" ? "" : filter} mentorships`} description="Students request mentors from their dashboard. New requests appear here." />
+        )}
       </div>
 
-      {/* REQUEST LIST */}
-      <div className="space-y-8 sm:space-y-10">
-        {requests.map((req) => (
-          <div
-            key={req._id}
-            className="p-6 sm:p-8 rounded-3xl bg-white/80 backdrop-blur-lg shadow-xl border border-white/40 hover:shadow-2xl transition-all"
-          >
-            {/* HEADER */}
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">{req.topic}</h2>
+      <Modal
+        open={Boolean(linkFor)}
+        onClose={() => setLinkFor(null)}
+        title="Share a meeting link"
+        description={linkFor ? `${linkFor.mentee?.name || "Your mentee"} will see it on their mentorship page.` : ""}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setLinkFor(null)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="meeting-link" loading={busy === `${linkFor?._id}:meeting-link`}>
+              Save link
+            </Button>
+          </>
+        }
+      >
+        <form id="meeting-link" onSubmit={saveLink}>
+          <Input label="Meeting link" type="url" leading={Link2} placeholder="https://meet.google.com/..." value={link} onChange={(e) => setLink(e.target.value)} data-autofocus />
+        </form>
+      </Modal>
 
-              <span
-                className={`px-4 py-2 text-sm font-semibold rounded-full capitalize 
-                  ${
-                    req.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : req.status === "active"
-                      ? "bg-blue-100 text-blue-700"
-                      : req.status === "completed"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-700"
-                  }
-                `}
-              >
-                {req.status}
-              </span>
-            </div>
-
-            {/* STUDENT INFO */}
-            <div className="text-gray-700 text-base sm:text-lg leading-relaxed">
-              <p><span className="font-semibold">Student:</span> {req.mentee?.name}</p>
-              <p><span className="font-semibold">Email:</span> {req.mentee?.email}</p>
-            </div>
-
-            {/* DESCRIPTION */}
-            {req.description && (
-              <p className="mt-4 text-gray-600 bg-gray-50 p-4 rounded-xl border text-sm sm:text-base">
-                {req.description}
-              </p>
-            )}
-
-            {/* BUTTONS */}
-            <div className="flex flex-wrap gap-3 sm:gap-4 mt-6 sm:mt-8">
-
-              {req.status === "pending" && (
-                <>
-                  <button
-                    onClick={() => respond(req._id, "active")}
-                    className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-emerald-600 text-white shadow-md hover:bg-emerald-700"
-                  >
-                    Accept
-                  </button>
-
-                  <button
-                    onClick={() => respond(req._id, "rejected")}
-                    className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-red-500 text-white shadow-md hover:bg-red-600"
-                  >
-                    Reject
-                  </button>
-                </>
-              )}
-
-              {req.status === "active" && (
-                <>
-                  <button
-                    onClick={() => openModal(req._id, req.meetingLink)}
-                    className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-purple-600 text-white hover:bg-purple-700"
-                  >
-                    Meeting Link
-                  </button>
-
-                  <button
-                    onClick={() => startSession(req._id)}
-                    className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-yellow-500 text-white hover:bg-yellow-600"
-                  >
-                    Start
-                  </button>
-
-                  <button
-                    onClick={() => endSession(req._id)}
-                    className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-gray-700 text-white hover:bg-gray-800"
-                  >
-                    End
-                  </button>
-                </>
-              )}
-
-              {req.status === "completed" && (
-                <span className="px-4 py-2 bg-green-100 text-green-700 rounded-xl">
-                  ✔ Session Completed
-                </span>
-              )}
-
-              {req.status === "rejected" && (
-                <span className="px-4 py-2 text-red-600 font-semibold text-sm sm:text-base">
-                  Rejected ❌
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* RESPONSIVE MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white/90 w-full max-w-md p-6 sm:p-8 rounded-3xl shadow-xl border border-white/40">
-
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800">
-              Meeting Link
-            </h2>
-
-            <input
-              type="text"
-              value={meetingLink}
-              onChange={(e) => setMeetingLink(e.target.value)}
-              className="w-full border p-3 rounded-xl shadow-inner focus:ring-2 focus:ring-emerald-500 text-sm sm:text-base"
-              placeholder="Paste Google Meet URL"
-            />
-
-            {/* MODAL BUTTONS */}
-            <div className="flex justify-end gap-4 mt-6">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-5 py-2 rounded-xl bg-gray-500 text-white hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={saveMeetingLink}
-                className="px-5 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-              >
-                Save
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-    </div>
+      <ConfirmDialog
+        open={Boolean(ending)}
+        onClose={() => setEnding(null)}
+        onConfirm={async () => {
+          if (await act(ending, "end", {}, { status: "completed", endDate: new Date().toISOString() }, "Mentorship completed.")) setEnding(null);
+        }}
+        loading={busy === `${ending?._id}:end`}
+        tone="info"
+        title="End this mentorship?"
+        confirmLabel="End mentorship"
+        description={`It moves to completed and ${ending?.mentee?.name || "your mentee"} can leave feedback.`}
+      />
+    </>
   );
-};
-
-export default ManageMentorshipAlumni;
+}

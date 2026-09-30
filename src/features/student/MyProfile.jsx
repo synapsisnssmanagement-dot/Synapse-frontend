@@ -1,219 +1,148 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { Building2, Phone, Sparkles, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import {
-  FiUser,
-  FiPhone,
-  FiBookOpen,
-  FiStar,
-  FiCamera,
-  FiSave,
-} from "react-icons/fi";
-import { FaLeaf } from "react-icons/fa";
+import Avatar from "@/components/ui/Avatar";
+import { Badge, LevelBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { Input } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import Progress from "@/components/ui/Progress";
+import { ProfileSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
+import UploadZone from "@/components/ui/UploadZone";
+import api, { errorMessage } from "@/lib/api";
+import { formatNumber, photoOf } from "@/lib/format";
+import { levelProgress, useStudentProfile } from "./data";
 
-const MyProfile = () => {
-  const [profile, setProfile] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    phoneNumber: "",
-    department: "",
-    talents: "",
+const talentsText = (t) => (Array.isArray(t) ? t.join(", ") : t || "");
+
+function ProfileForm({ student, onSaved }) {
+  const [values, setValues] = useState({
+    name: student.name || "",
+    phoneNumber: student.phoneNumber || "",
+    department: student.department || "",
+    talents: talentsText(student.talents),
   });
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  const token = getToken();
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/students/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        setProfile(res.data.student);
-
-        setFormData({
-          name: res.data.student.name || "",
-          phoneNumber: res.data.student.phoneNumber || "",
-          department: res.data.student.department || "",
-          talents: (res.data.student.talents || []).join(", "),
-        });
-
-        setImagePreview(res.data.student.profileImage.url || null);
-      } catch (err) {
-        toast.error("Failed to load profile");
-      }
-    };
-
-    fetchProfile();
-  }, [token]);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const update = (e) => {
+    const { name, value } = e.target;
+    setValues((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    const next = {};
+    if (values.name.trim().length < 2) next.name = "Enter your name.";
+    if (values.phoneNumber.replace(/\D/g, "").length < 10) next.phoneNumber = "Enter a phone number with at least 10 digits.";
+    if (!values.department.trim()) next.department = "Enter your department.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
 
+    setSaving(true);
+    const form = new FormData();
+    form.append("name", values.name.trim());
+    form.append("phoneNumber", values.phoneNumber.trim());
+    form.append("department", values.department.trim());
+    values.talents
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .forEach((t) => form.append("talents", t));
+    if (photo) form.append("profileImage", photo);
     try {
-      setLoading(true);
-
-      const data = new FormData();
-      data.append("name", formData.name);
-      data.append("phoneNumber", formData.phoneNumber);
-      data.append("department", formData.department);
-      data.append(
-        "talents",
-        formData.talents.split(",").map((t) => t.trim())
-      );
-
-      if (imageFile) data.append("profileImage", imageFile);
-
-      const res = await axios.put(
-        `${API_URL}/api/students/profile/edit`,
-        data,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      setProfile(res.data.student);
-      toast.success("Profile updated successfully!");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Profile update failed");
+      const res = await api.put("/api/students/profile/edit", form);
+      const saved = res.data?.student || {};
+      localStorage.setItem("name", values.name.trim());
+      toast.success("Profile saved.");
+      onSaved({ ...student, ...saved, profileImage: saved.profileImage ? { url: saved.profileImage } : student.profileImage });
+      setPhoto(null);
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't save your profile."));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
-
-  if (!profile)
-    return (
-      <div className="text-center text-green-700 mt-10 text-xl animate-pulse">
-        Loading profile...
-      </div>
-    );
 
   return (
-    <div className="min-h-screen flex justify-center items-center  sm:p-6">
-      <div className="w-full max-w-2xl bg-white/80 backdrop-blur-lg shadow-2xl rounded-3xl border border-green-300 p-6 sm:p-8 transition-all duration-300 hover:shadow-green-300/40">
-
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-6 sm:mb-8 text-green-700 flex items-center justify-center gap-2 drop-shadow-sm">
-          <FaLeaf className="text-green-600 text-2xl sm:text-3xl" />
-          My Profile
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-
-          {/* Profile Image */}
-          <div className="flex flex-col items-center">
-            <div className="relative group">
-              <img
-                src={imagePreview || "/default-avatar.png"}
-                alt="Profile"
-                className="w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-green-500 shadow-md transition-all duration-300 group-hover:scale-105"
-              />
-
-              <label className="absolute bottom-2 right-2 bg-green-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full cursor-pointer flex items-center gap-1 hover:bg-green-700 shadow-md transition">
-                <FiCamera />
-                <span className="hidden sm:inline">Change</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* INPUTS */}
-          <div className="grid grid-cols-1 gap-4 sm:gap-5">
-
-            <div>
-              <label className="flex items-center gap-2 font-semibold mb-1 text-green-800 text-sm sm:text-base">
-                <FiUser /> Full Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full p-3 border border-green-300 rounded-xl bg-green-50 focus:ring-2 focus:ring-green-400 outline-none transition text-sm sm:text-base"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 font-semibold mb-1 text-green-800 text-sm sm:text-base">
-                <FiPhone /> Phone Number
-              </label>
-              <input
-                type="text"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                className="w-full p-3 border border-green-300 rounded-xl bg-green-50 focus:ring-2 focus:ring-green-400 outline-none transition text-sm sm:text-base"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 font-semibold mb-1 text-green-800 text-sm sm:text-base">
-                <FiBookOpen /> Department
-              </label>
-              <input
-                type="text"
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                className="w-full p-3 border border-green-300 rounded-xl bg-green-50 focus:ring-2 focus:ring-green-400 outline-none transition text-sm sm:text-base"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 font-semibold mb-1 text-green-800 text-sm sm:text-base">
-                <FiStar /> Talents (comma separated)
-              </label>
-              <input
-                type="text"
-                name="talents"
-                value={formData.talents}
-                onChange={handleChange}
-                className="w-full p-3 border border-green-300 rounded-xl bg-green-50 focus:ring-2 focus:ring-green-400 outline-none transition text-sm sm:text-base"
-              />
-            </div>
-
-          </div>
-
-          {/* SUBMIT BUTTON */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center items-center gap-2 py-3 text-base sm:text-lg font-semibold bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md hover:shadow-green-400/50 hover:scale-[1.02] transition-all duration-300"
-          >
-            <FiSave className="text-lg sm:text-xl" />
-            {loading ? "Updating..." : "Save Changes"}
-          </button>
-
-        </form>
+    <form onSubmit={submit} noValidate className="space-y-6">
+      <Panel title="Photo">
+        <UploadZone shape="avatar" file={photo} onChange={setPhoto} hint="Shown to coordinators, teachers and mentors." />
+      </Panel>
+      <Panel title="Personal details">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Input label="Full name" name="name" leading={UserRound} value={values.name} onChange={update} error={errors.name} required />
+          <Input label="Phone number" name="phoneNumber" type="tel" leading={Phone} value={values.phoneNumber} onChange={update} error={errors.phoneNumber} required />
+          <Input label="Department" name="department" leading={Building2} value={values.department} onChange={update} error={errors.department} required />
+          <Input
+            label="Talents"
+            name="talents"
+            leading={Sparkles}
+            hint="Separate with commas. Coordinators search by these."
+            placeholder="e.g. photography, first aid"
+            value={values.talents}
+            onChange={update}
+          />
+        </div>
+      </Panel>
+      <div className="flex justify-end">
+        <Button type="submit" loading={saving}>
+          Save changes
+        </Button>
       </div>
-    </div>
+    </form>
   );
-};
+}
 
-export default MyProfile;
+export default function MyProfile() {
+  const profile = useStudentProfile();
+  const s = profile.data;
+  const hours = Number(s?.totalVolunteerHours) || 0;
+  const { current, next, pct } = levelProgress(hours);
+
+  return (
+    <>
+      <PageHeader eyebrow="Account" title="Your profile" description="How you appear to your unit, and the record you've built." />
+      {profile.loading ? (
+        <ProfileSkeleton />
+      ) : profile.status === "error" || !s ? (
+        <ErrorState title="We couldn't load your profile" error={profile.error} onRetry={profile.reload} />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl bg-ink p-6 text-on-dark">
+            <Avatar src={photoOf(s)} name={s.name} size="xl" className="ring-4 ring-white/10" />
+            <p className="mt-5 text-xl font-semibold tracking-[-0.02em] text-white">{s.name}</p>
+            <p className="mt-1 text-[13.5px] text-on-dark/60">{s.email}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge tone="live">{s.role === "volunteer" ? "Volunteer" : "Student"}</Badge>
+              {current ? <LevelBadge level={current.name} /> : null}
+            </div>
+            <div className="mt-6 border-t border-white/10 pt-5">
+              <p className="tabular text-3xl font-semibold text-brand">
+                {formatNumber(Math.round(hours * 10) / 10)} <span className="text-base font-medium text-on-dark/60">hours</span>
+              </p>
+              <Progress dark className="mt-3" size="sm" value={pct} max={100} valueLabel={next ? `${Math.max(0, Math.ceil(next.minHours - hours))} h to ${next.name}` : "Platinum"} />
+            </div>
+            <dl className="mt-6 space-y-3 border-t border-white/10 pt-5 text-[13.5px]">
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Institution</dt>
+                <dd className="text-right text-white">{s.institution?.name || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Grace marks</dt>
+                <dd className="tabular text-right text-white">{s.graceMarks || 0}</dd>
+              </div>
+            </dl>
+          </aside>
+          <ProfileForm key={s._id} student={s} onSaved={(next2) => profile.mutate(next2)} />
+        </div>
+      )}
+    </>
+  );
+}

@@ -1,163 +1,128 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { Send, UserRoundSearch } from "lucide-react";
 import { toast } from "sonner";
+import Avatar from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Dialog";
+import { Input, Textarea } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import { photoOf } from "@/lib/format";
 
-const MentorshipRequest = () => {
-  const [mentors, setMentors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedMentor, setSelectedMentor] = useState(null);
+function availabilityLabel(value) {
+  if (value == null) return null;
+  if (typeof value === "boolean") return value ? "Available" : "Unavailable";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "isAvailable" in value) return value.isAvailable ? "Available" : "Unavailable";
+  return null;
+}
+
+export default function MentorshipRequest() {
+  const mentors = useResource(() => api.get("/api/mentorship/mentors").then((res) => res.data?.mentors || []), []);
+  const [query, setQuery] = useState("");
+  const [mentor, setMentor] = useState(null);
   const [topic, setTopic] = useState("");
   const [description, setDescription] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const token = getToken();
+  const q = query.trim().toLowerCase();
+  const rows = (mentors.data || []).filter((m) => !q || `${m.name} ${m.department}`.toLowerCase().includes(q));
 
-  // Fetch mentors of student's institution
-  const fetchMentors = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/mentorship/mentors`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setMentors(res.data.mentors || []);
-      setLoading(false);
-    } catch (err) {
-      toast.error("Failed to load mentors");
-      setLoading(false);
-    }
+  const close = () => {
+    setMentor(null);
+    setTopic("");
+    setDescription("");
   };
 
-  useEffect(() => {
-    fetchMentors();
-  }, []);
-
-  // Send mentorship request
-  const sendRequest = async () => {
-    if (!selectedMentor) return toast.error("Please select a mentor");
-    if (!topic.trim()) return toast.error("Topic is required");
-
+  const send = async (e) => {
+    e.preventDefault();
+    if (!topic.trim()) {
+      toast.error("Add a topic so your mentor knows what to expect.");
+      return;
+    }
+    setSending(true);
     try {
-      await axios.post(
-        `${API_URL}/api/mentorship/request`,
-        {
-          mentorId: selectedMentor._id,
-          topic,
-          description,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success("Mentorship request sent!");
-      setSelectedMentor(null);
-      setTopic("");
-      setDescription("");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to send request");
+      await api.post("/api/mentorship/request", { mentorId: mentor._id, topic: topic.trim(), description: description.trim() });
+      toast.success(`Request sent to ${mentor.name}.`);
+      close();
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't send that request."));
+    } finally {
+      setSending(false);
     }
   };
 
   return (
-    <div className="w-full px-4 sm:px-6 py-8 bg-gray-50 min-h-screen">
+    <>
+      <PageHeader
+        eyebrow="Mentorship"
+        title="Find a mentor"
+        description="Alumni who served in NSS before you, ready to share what they've learned."
+        actions={<SearchInput value={query} onChange={setQuery} placeholder="Search by name or department" className="w-72" />}
+      />
 
-      {/* HEADER */}
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-        Request a Mentorship
-      </h1>
-      <p className="text-gray-600 mb-8 sm:mb-10 text-sm sm:text-base">
-        Select an alumni mentor and tell them what you'd like to discuss.
-      </p>
-
-      {/* MENTOR LIST */}
-      <h2 className="text-lg font-semibold text-gray-800 mb-3">
-        Choose a Mentor
-      </h2>
-
-      {loading ? (
-        <p className="text-gray-600">Loading mentors...</p>
-      ) : mentors.length === 0 ? (
-        <p className="text-gray-500">No mentors available right now.</p>
+      {mentors.loading ? (
+        <CardGridSkeleton count={6} />
+      ) : mentors.status === "error" ? (
+        <ErrorState error={mentors.error} onRetry={mentors.reload} />
+      ) : rows.length ? (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((m) => {
+            const availability = availabilityLabel(m.mentorshipAvailability);
+            return (
+              <li key={m._id} className="flex flex-col rounded-xl border border-line bg-paper p-5">
+                <div className="flex items-center gap-4">
+                  <Avatar src={photoOf(m)} name={m.name} size="lg" />
+                  <div className="min-w-0">
+                    <p className="truncate text-[16px] font-semibold text-fg">{m.name}</p>
+                    <p className="truncate text-[13px] text-muted">{m.department || "Alumni"}</p>
+                  </div>
+                </div>
+                {availability ? (
+                  <Badge tone={availability === "Unavailable" ? "neutral" : "success"} className="mt-4 self-start">
+                    {availability}
+                  </Badge>
+                ) : null}
+                <Button variant="dark" size="sm" icon={Send} className="mt-5" onClick={() => setMentor(m)} disabled={availability === "Unavailable"}>
+                  Request mentorship
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-10">
-          {mentors.map((mentor) => (
-            <div
-              key={mentor._id}
-              onClick={() => setSelectedMentor(mentor)}
-              className={`flex items-center gap-4 p-4 sm:p-5 rounded-xl border shadow-sm cursor-pointer transition-all 
-                ${
-                  selectedMentor?._id === mentor._id
-                    ? "border-2 border-green-500 bg-green-50"
-                    : "bg-white hover:bg-gray-100"
-                }`}
-            >
-              {/* IMAGE */}
-              <img
-                src={mentor.profileImage?.url || "https://via.placeholder.com/60"}
-                alt="mentor"
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover"
-              />
-
-              {/* DETAILS */}
-              <div className="flex-1">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-                  {mentor.name}
-                </h3>
-                <p className="text-gray-600 text-sm">{mentor.department}</p>
-                <p className="text-gray-500 text-xs sm:text-sm">{mentor.email}</p>
-              </div>
-
-              {/* SELECT INDICATOR */}
-              <div
-                className={`w-5 h-5 rounded-full border-2 transition-all 
-                  ${
-                    selectedMentor?._id === mentor._id
-                      ? "border-green-600 bg-green-600"
-                      : "border-gray-400"
-                  }`}
-              ></div>
-            </div>
-          ))}
-        </div>
+        <EmptyState icon={UserRoundSearch} title={q ? "No mentors match" : "No mentors yet"} description={q ? "Try a different name or department." : "Alumni mentors from your institution will appear here."} />
       )}
 
-      {/* FORM */}
-      <div className="bg-white rounded-xl p-5 sm:p-6 shadow">
-
-        {/* Topic */}
-        <label className="font-semibold text-gray-700 text-sm sm:text-base">
-          Topic *
-        </label>
-        <input
-          type="text"
-          className="w-full border p-3 rounded-lg mt-1 mb-6 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm sm:text-base"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="Example: Web Development, Internship Guidance"
-        />
-
-        {/* Description */}
-        <label className="font-semibold text-gray-700 text-sm sm:text-base">
-          Description (Optional)
-        </label>
-        <textarea
-          className="w-full border p-3 rounded-lg mt-1 mb-6 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm sm:text-base"
-          rows="4"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Explain what guidance you need..."
-        ></textarea>
-
-        {/* BUTTON */}
-        <button
-          onClick={sendRequest}
-          className="w-full sm:w-auto px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition text-sm sm:text-base"
-        >
-          Send Mentorship Request
-        </button>
-      </div>
-    </div>
+      <Modal
+        open={Boolean(mentor)}
+        onClose={close}
+        eyebrow="Mentorship request"
+        title={mentor ? `Ask ${mentor.name}` : ""}
+        description="Tell them what you'd like help with. They'll accept or decline from their dashboard."
+        footer={
+          <>
+            <Button variant="outline" onClick={close} disabled={sending}>
+              Cancel
+            </Button>
+            <Button type="submit" form="mentorship-request" icon={Send} loading={sending}>
+              Send request
+            </Button>
+          </>
+        }
+      >
+        <form id="mentorship-request" onSubmit={send} className="space-y-5" noValidate>
+          <Input label="Topic" placeholder="e.g. Preparing for campus placements" value={topic} onChange={(e) => setTopic(e.target.value)} required data-autofocus />
+          <Textarea label="Details" rows={4} placeholder="Anything that would help them prepare." value={description} onChange={(e) => setDescription(e.target.value)} />
+        </form>
+      </Modal>
+    </>
   );
-};
-
-export default MentorshipRequest;
+}

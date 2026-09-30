@@ -1,239 +1,138 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import {
-  FaComments,
-  FaUserGraduate,
-  FaCalendarAlt,
-} from "react-icons/fa";
-import { Star } from "lucide-react";
+import Link from "next/link";
+import { HandCoins, MessageCircle, Quote, Star, Users } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
+import { StatusBadge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import PageHeader, { Accent } from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { DashboardSkeleton } from "@/components/ui/Skeleton";
+import StatCard from "@/components/ui/StatCard";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import { firstName, greeting, photoOf, timeAgo } from "@/lib/format";
+import { averageRating, useAlumniDashboard, useMenteeFeedback, useMentees } from "./data";
 
-const AlumniDashboard = () => {
-  const [dashboard, setDashboard] = useState(null);
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function AlumniDashboard() {
+  const dashboard = useAlumniDashboard();
+  const mentees = useMentees();
+  const feedback = useMenteeFeedback();
 
-  const token = getToken();
+  if (dashboard.loading) return <DashboardSkeleton />;
+  if (dashboard.status === "error" || !dashboard.data) {
+    return <ErrorState title="We couldn't load your dashboard" error={dashboard.error} onRetry={dashboard.reload} />;
+  }
 
-  useEffect(() => {
-    fetchDashboard();
-    fetchFeedbacks();
-  }, []);
-
-  const fetchDashboard = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/alumni/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setDashboard(res.data.data);
-    } catch (error) {
-      console.error("Dashboard error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchFeedbacks = async () => {
-    try {
-      const res = await axios.get(
-        `${API_URL}/api/mentorship/mentee-feedback/all`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setFeedbacks(res.data.feedbacks || []);
-    } catch (err) {
-      console.error("Feedback fetch error:", err);
-    }
-  };
-
-  const renderStars = (count) =>
-    [...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        size={18}
-        className={`${i < count ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
-      />
-    ));
-
-  if (loading || !dashboard)
-    return <p className="text-center mt-10 text-lg text-gray-600">Loading...</p>;
-
-  const latestFeedback = feedbacks[feedbacks.length - 1];
+  const a = dashboard.data;
+  const requests = mentees.data || [];
+  const pending = requests.filter((r) => r.status === "pending");
+  const active = requests.filter((r) => r.status === "active");
+  const completed = requests.filter((r) => r.status === "completed");
+  const rating = averageRating(feedback.data || []);
+  const testimonials = a.testimonials || [];
 
   return (
-    <div className="space-y-10 p-4 sm:p-6 bg-gradient-to-b from-green-50 to-white min-h-screen">
+    <>
+      <PageHeader
+        eyebrow={a.institution?.name || "Alumni"}
+        title={
+          <>
+            {greeting()}, <Accent>{firstName(a.name)}</Accent>
+          </>
+        }
+        description={`${a.department || "Alumni"}${a.graduationYear ? ` · Class of ${a.graduationYear}` : ""}. Thank you for staying close to the unit.`}
+        actions={
+          <Button href="/alumnilayout/donations" icon={HandCoins}>
+            Support a drive
+          </Button>
+        }
+      />
 
-      {/* =======================================================
-          PROFILE HEADER
-      ======================================================== */}
-      <div className="bg-white/70 backdrop-blur-xl shadow-xl rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-6 border border-green-100">
-        <img
-          src={dashboard.profileImage?.url || "/default-user.png"}
-          className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover shadow-lg ring-4 ring-green-500/50 mx-auto sm:mx-0"
-        />
-
-        <div className="text-center sm:text-left">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">{dashboard.name}</h2>
-          <p className="text-gray-600 break-all">{dashboard.email}</p>
-          <p className="text-gray-700">
-            {dashboard.department} • {dashboard.graduationYear}
+      <div className="grid gap-4 lg:grid-cols-12">
+        <section aria-labelledby="requests-title" className="flex flex-col rounded-2xl bg-ink p-6 text-on-dark lg:col-span-5">
+          <p id="requests-title" className="eyebrow text-on-dark/55">
+            Waiting on you
           </p>
-          <p className="text-gray-700 mt-1">
-            Institution:{" "}
-            <span className="font-semibold text-green-800">
-              {dashboard.institution?.name}
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* =======================================================
-          STATS GRID
-      ======================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-
-        {/* Mentorship Count */}
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-green-600 to-green-500 text-white shadow-xl flex items-center gap-4 hover:scale-[1.02] transition">
-          <FaUserGraduate className="text-4xl opacity-90" />
-          <div>
-            <p className="text-3xl sm:text-4xl font-bold">{dashboard.mentorships.length}</p>
-            <p className="opacity-90">Total Mentorships</p>
-          </div>
-        </div>
-
-        {/* Feedback Count */}
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-xl flex items-center gap-4 hover:scale-[1.02] transition">
-          <FaComments className="text-4xl opacity-90" />
-          <div>
-            <p className="text-3xl sm:text-4xl font-bold">{feedbacks.length}</p>
-            <p className="opacity-90">Feedback Received</p>
-          </div>
-        </div>
-
-        {/* Testimonials Count */}
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-green-600 to-green-500 text-white shadow-xl flex items-center gap-4 hover:scale-[1.02] transition">
-          <FaComments className="text-4xl opacity-90" />
-          <div>
-            <p className="text-3xl sm:text-4xl font-bold">{dashboard.testimonials.length}</p>
-            <p className="opacity-90">Testimonials</p>
-          </div>
-        </div>
-      </div>
-
-      {/* =======================================================
-          ⭐ LATEST FEEDBACK
-      ======================================================== */}
-      <div className="bg-white shadow-xl rounded-2xl p-4 sm:p-6 border border-green-100">
-
-        <h3 className="text-xl sm:text-2xl font-bold text-green-800 flex items-center gap-2 mb-4">
-          ⭐ Latest Student Feedback
-        </h3>
-
-        {!latestFeedback ? (
-          <p className="text-gray-500 italic">No feedback received yet.</p>
-        ) : (
-          <div className="p-4 sm:p-6 rounded-xl border bg-gray-50 shadow-inner">
-
-            <div className="flex items-center gap-4 mb-3">
-              <div className="p-3 bg-green-100 rounded-full">
-                <FaUserGraduate className="text-green-700 text-xl" />
-              </div>
-
-              <div>
-                <p className="font-semibold text-green-700">{latestFeedback.mentee?.name}</p>
-                <p className="text-gray-500 text-sm break-all">
-                  {latestFeedback.mentee?.email}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-1 mb-3">{renderStars(latestFeedback.feedback.rating)}</div>
-
-            <p className="p-3 bg-white rounded-lg border text-gray-700 shadow-sm">
-              {latestFeedback.feedback.comment}
-            </p>
-
-            <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
-              <FaCalendarAlt /> Completed:{" "}
-              {latestFeedback.completedAt
-                ? new Date(latestFeedback.completedAt).toLocaleDateString()
-                : "N/A"}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* =======================================================
-          MENTORSHIP LIST
-      ======================================================== */}
-      <div className="bg-white shadow-xl rounded-2xl p-4 sm:p-6 border border-green-100">
-        <h3 className="text-xl sm:text-2xl font-bold text-green-800 flex items-center gap-2 mb-4">
-          📘 Mentorship Sessions
-        </h3>
-
-        {dashboard.mentorships.length === 0 ? (
-          <p className="text-gray-500">No mentorship sessions found.</p>
-        ) : (
-          <div className="space-y-3">
-            {dashboard.mentorships.map((m) => (
-              <div
-                key={m._id}
-                className="p-4 bg-gray-50 rounded-xl border hover:bg-gray-100 transition"
-              >
-                <p className="font-semibold text-gray-800 break-words">
-                  Topic: {m.topic}
-                </p>
-                <p className="text-gray-600 text-sm">Status: {m.status}</p>
-                <p className="text-gray-500 text-xs">
-                  Requested: {new Date(m.requestDate).toLocaleDateString()}
-                </p>
-              </div>
+          <p className="tabular mt-5 text-[clamp(3.25rem,6vw,4.75rem)] font-semibold leading-none tracking-[-0.05em] text-brand">{pending.length}</p>
+          <p className="mt-3 text-[14.5px] text-on-dark/65">{pending.length === 1 ? "student has" : "students have"} asked you to mentor them.</p>
+          <ul className="mt-6 divide-y divide-white/10 border-t border-white/10">
+            {pending.slice(0, 3).map((r) => (
+              <li key={r._id} className="flex items-center gap-3 py-3">
+                <Avatar src={photoOf(r.mentee)} name={r.mentee?.name} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold text-white">{r.mentee?.name}</span>
+                  <span className="block truncate text-[12.5px] text-on-dark/55">{r.topic}</span>
+                </span>
+              </li>
             ))}
-          </div>
-        )}
+          </ul>
+          <Button href="/alumnilayout/managementorship" variant="light" size="sm" className="mt-auto self-start">
+            {pending.length ? "Review requests" : "Manage mentees"}
+          </Button>
+        </section>
+
+        <div className="grid grid-cols-2 gap-3 lg:col-span-7">
+          <StatCard align="bottom" label="Active mentees" value={active.length} icon={Users} variant="mint" />
+          <StatCard align="bottom" label="Completed" value={completed.length} icon={MessageCircle} />
+          <StatCard align="bottom" label="Mentee rating" value={rating ? rating.toFixed(1) : "—"} unit={rating ? "/ 5" : undefined} icon={Star} footnote={`${(feedback.data || []).length} ${(feedback.data || []).length === 1 ? "review" : "reviews"}`} />
+          <StatCard align="bottom" label="Testimonials" value={testimonials.length} icon={Quote} />
+        </div>
       </div>
 
-      {/* =======================================================
-          🟦 TESTIMONIALS SECTION
-      ======================================================== */}
-      <div className="bg-white shadow-xl rounded-2xl p-4 sm:p-6 border border-green-100">
-        <h3 className="text-xl sm:text-2xl font-bold text-green-700 flex items-center gap-2 mb-4">
-          💬 Testimonials
-        </h3>
-
-        {dashboard.testimonials.length === 0 ? (
-          <p className="text-gray-500">No testimonials yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {dashboard.testimonials.map((t) => (
-              <div
-                key={t._id}
-                className="p-4 sm:p-5 bg-green-50 border border-green-100 rounded-xl shadow hover:shadow-lg transition"
-              >
-                <p className="text-gray-800 font-medium mb-2 break-words">
-                  “{t.message}”
-                </p>
-
-                <p className="text-xs text-gray-500 mb-1">
-                  Visibility:{" "}
-                  <span className="font-semibold text-green-600">
-                    {t.visibility}
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <Panel
+          title="Your mentees"
+          bodyClassName="p-0"
+          actions={
+            <Link href="/alumnilayout/mentorshipchatlayout" className="link-draw text-[13px] font-semibold text-fg-2 hover:text-ink">
+              Open chat
+            </Link>
+          }
+        >
+          {active.length || completed.length ? (
+            <ul className="divide-y divide-line">
+              {[...active, ...completed].slice(0, 5).map((r) => (
+                <li key={r._id} className="flex items-center gap-3 px-5 py-3.5">
+                  <Avatar src={photoOf(r.mentee)} name={r.mentee?.name} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-fg">{r.mentee?.name}</span>
+                    <span className="block truncate text-[12.5px] text-muted">{r.topic}</span>
                   </span>
-                </p>
+                  <StatusBadge status={r.status} size="sm" />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState size="sm" icon={Users} title="No mentees yet" description="Accepted requests will appear here." />
+          )}
+        </Panel>
 
-                <p className="text-xs text-gray-400">
-                  {new Date(t.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+        <Panel
+          title="Your testimonials"
+          bodyClassName="p-0"
+          actions={
+            <Link href="/alumnilayout/testimonials" className="link-draw text-[13px] font-semibold text-fg-2 hover:text-ink">
+              Write one
+            </Link>
+          }
+        >
+          {testimonials.length ? (
+            <ul className="divide-y divide-line">
+              {testimonials.slice(0, 4).map((t) => (
+                <li key={t._id} className="px-5 py-4">
+                  <p className="line-clamp-2 font-display text-[1.1rem] leading-snug text-ink">&ldquo;{t.message}&rdquo;</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <StatusBadge status={t.visibility || "pending"} label={t.visibility === "approved" ? "Published" : t.visibility === "rejected" ? "Not published" : "In review"} size="sm" />
+                    {t.createdAt ? <span className="text-[12px] text-subtle">{timeAgo(t.createdAt)}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState size="sm" icon={Quote} title="No testimonials yet" description="Share what NSS meant to you — it may appear on the public site." />
+          )}
+        </Panel>
       </div>
-
-    </div>
+    </>
   );
-};
-
-export default AlumniDashboard;
+}

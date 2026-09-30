@@ -1,7 +1,6 @@
 import "./globals.css";
 import { Plus_Jakarta_Sans, Instrument_Serif } from "next/font/google";
 import { Toaster } from "sonner";
-import EmotionRegistry from "@/components/EmotionRegistry";
 import { SocketProvider } from "@/context/SocketContext";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -62,12 +61,10 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
       </head>
       <body>
-        <EmotionRegistry>
-          <SocketProvider>
-            <Toaster position="bottom-right" richColors closeButton />
-            {children}
-          </SocketProvider>
-        </EmotionRegistry>
+        <SocketProvider>
+          <Toaster position="bottom-right" richColors closeButton />
+          {children}
+        </SocketProvider>
       </body>
     </html>
   );

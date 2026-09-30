@@ -1,172 +1,128 @@
 "use client";
 
-import { getToken } from "@/utils/auth";
-import { API_URL } from "@/utils/config";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { FaEdit, FaSave, FaSchool, FaCamera } from "react-icons/fa";
+import { useState } from "react";
+import { Building2, GraduationCap, Mail, UserRound } from "lucide-react";
+import { toast } from "sonner";
+import Avatar from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import { Input } from "@/components/ui/Field";
+import PageHeader from "@/components/ui/PageHeader";
+import Panel from "@/components/ui/Panel";
+import { ProfileSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
+import UploadZone from "@/components/ui/UploadZone";
+import useResource from "@/hooks/useResource";
+import api, { errorMessage } from "@/lib/api";
+import { photoOf } from "@/lib/format";
 
-const AlumniProfile = () => {
-  const [profile, setProfile] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [newImage, setNewImage] = useState(null);
-  const [previewImg, setPreviewImg] = useState("");
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const token = getToken();
+function ProfileForm({ alumni, onSaved }) {
+  const [values, setValues] = useState({
+    name: alumni.name || "",
+    email: alumni.email || "",
+    department: alumni.department || "",
+    graduationYear: alumni.graduationYear ? String(alumni.graduationYear) : "",
+  });
+  const [photo, setPhoto] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const update = (e) => {
+    const { name, value } = e.target;
+    setValues((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
+  };
 
-  const fetchProfile = async () => {
+  const submit = async (e) => {
+    e.preventDefault();
+    const year = Number(values.graduationYear);
+    const next = {};
+    if (values.name.trim().length < 2) next.name = "Enter your name.";
+    if (!EMAIL_RE.test(values.email.trim())) next.email = "Enter a valid email address.";
+    if (!values.department.trim()) next.department = "Enter your department.";
+    if (!year || year < 1950 || year > new Date().getFullYear()) next.graduationYear = `Enter a year between 1950 and ${new Date().getFullYear()}.`;
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    setSaving(true);
+    const form = new FormData();
+    form.append("name", values.name.trim());
+    form.append("email", values.email.trim());
+    form.append("department", values.department.trim());
+    form.append("graduationYear", String(year));
+    if (photo) form.append("profileImage", photo);
     try {
-      const res = await axios.get(`${API_URL}/api/alumni/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setProfile(res.data.data);
-      setPreviewImg(res.data.data?.profileImage?.url || "/default-user.png");
+      const res = await api.put("/api/alumni/profile", form);
+      localStorage.setItem("name", values.name.trim());
+      localStorage.setItem("email", values.email.trim());
+      toast.success("Profile saved.");
+      onSaved(res.data?.updated || { ...alumni, ...values });
+      setPhoto(null);
     } catch (error) {
-      console.error("Profile fetch error:", error);
+      toast.error(errorMessage(error, "We couldn't save your profile."));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
-
-  const handleChange = (e) => {
-    setProfile({ ...profile, [e.target.name]: e.target.value });
-  };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setNewImage(file);
-      setPreviewImg(URL.createObjectURL(file));
-    }
-  };
-
-  const updateProfile = async () => {
-    try {
-      const formData = new FormData();
-
-      formData.append("name", profile.name);
-      formData.append("email", profile.email);
-      formData.append("department", profile.department);
-      formData.append("graduationYear", profile.graduationYear);
-
-      if (newImage) formData.append("profileImage", newImage);
-
-      await axios.put(`${API_URL}/api/alumni/profile`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      setEditMode(false);
-      fetchProfile();
-    } catch (error) {
-      console.error("Update error:", error);
-    }
-  };
-
-  if (loading)
-    return <p className="text-center mt-10 text-gray-600">Loading...</p>;
-
-  if (!profile)
-    return <p className="text-center mt-10 text-red-500">Profile not found.</p>;
 
   return (
-    <div className="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-0">
-      <h1 className="text-2xl sm:text-3xl font-semibold mb-6 text-gray-800">
-        My Profile
-      </h1>
-
-      <div className="bg-white shadow-lg rounded-xl p-6 border space-y-6">
-
-        {/* Profile Image Section */}
-        <div className="flex flex-col sm:flex-row items-center gap-6 relative">
-          <div className="relative">
-            <img
-              src={previewImg}
-              alt="Profile"
-              className="w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover border-2 border-green-600 shadow"
-            />
-
-            {editMode && (
-              <label className="absolute right-0 bottom-0 bg-white rounded-full p-2 cursor-pointer shadow-md">
-                <FaCamera className="text-green-700" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-
-          <div className="text-center sm:text-left">
-            <h2 className="text-xl sm:text-2xl font-semibold">{profile.name}</h2>
-            <p className="text-gray-600 text-sm sm:text-base">{profile.email}</p>
-            <p className="text-gray-600 text-sm sm:text-base">
-              {profile.department} • {profile.graduationYear}
-            </p>
-          </div>
+    <form onSubmit={submit} noValidate className="space-y-6">
+      <Panel title="Photo">
+        <UploadZone shape="avatar" file={photo} onChange={setPhoto} hint="Shown to students browsing mentors." />
+      </Panel>
+      <Panel title="Personal details">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Input label="Full name" name="name" leading={UserRound} value={values.name} onChange={update} error={errors.name} required />
+          <Input label="Email" name="email" type="email" leading={Mail} value={values.email} onChange={update} error={errors.email} required />
+          <Input label="Department" name="department" leading={Building2} value={values.department} onChange={update} error={errors.department} required />
+          <Input label="Graduation year" name="graduationYear" type="number" inputMode="numeric" leading={GraduationCap} value={values.graduationYear} onChange={update} error={errors.graduationYear} required />
         </div>
-
-        {/* Institution */}
-        <div className="flex items-center gap-3 text-gray-700 text-sm sm:text-base">
-          <FaSchool className="text-xl text-green-700" />
-          <span className="font-medium">
-            Institution: {profile.institution?.name}
-          </span>
-        </div>
-
-        <hr />
-
-        {/* Editable Form */}
-        <div className="space-y-4">
-          {["name", "email", "department", "graduationYear"].map((field) => (
-            <div key={field}>
-              <label className="font-medium capitalize text-gray-700">
-                {field.replace(/([A-Z])/g, " $1")}
-              </label>
-              <input
-                name={field}
-                disabled={!editMode}
-                value={profile[field]}
-                onChange={handleChange}
-                className={`w-full p-2 border rounded-lg mt-1 text-sm sm:text-base ${
-                  !editMode && "bg-gray-100"
-                }`}
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Buttons */}
-        <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4">
-          {!editMode ? (
-            <button
-              onClick={() => setEditMode(true)}
-              className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 w-full sm:w-auto"
-            >
-              <FaEdit /> Edit Profile
-            </button>
-          ) : (
-            <button
-              onClick={updateProfile}
-              className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 w-full sm:w-auto"
-            >
-              <FaSave /> Save Changes
-            </button>
-          )}
-        </div>
+      </Panel>
+      <div className="flex justify-end">
+        <Button type="submit" loading={saving}>
+          Save changes
+        </Button>
       </div>
-    </div>
+    </form>
   );
-};
+}
 
-export default AlumniProfile;
+export default function AlumniProfile() {
+  const profile = useResource(() => api.get("/api/alumni/profile").then((res) => res.data?.data || null), []);
+  const a = profile.data;
+
+  return (
+    <>
+      <PageHeader eyebrow="Account" title="Your profile" description="How students see you when they look for a mentor." />
+      {profile.loading ? (
+        <ProfileSkeleton />
+      ) : profile.status === "error" || !a ? (
+        <ErrorState title="We couldn't load your profile" error={profile.error} onRetry={profile.reload} />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl bg-ink p-6 text-on-dark">
+            <Avatar src={photoOf(a)} name={a.name} size="xl" className="ring-4 ring-white/10" />
+            <p className="mt-5 text-xl font-semibold tracking-[-0.02em] text-white">{a.name}</p>
+            <p className="mt-1 text-[13.5px] text-on-dark/60">{a.email}</p>
+            <div className="mt-4">
+              <Badge tone="live">Alumni{a.graduationYear ? ` · ${a.graduationYear}` : ""}</Badge>
+            </div>
+            <dl className="mt-6 space-y-3 border-t border-white/10 pt-5 text-[13.5px]">
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Institution</dt>
+                <dd className="text-right text-white">{a.institution?.name || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-on-dark/50">Department</dt>
+                <dd className="text-right text-white">{a.department || "—"}</dd>
+              </div>
+            </dl>
+          </aside>
+          <ProfileForm key={a._id} alumni={a} onSaved={(next) => profile.mutate({ ...a, ...next, institution: a.institution })} />
+        </div>
+      )}
+    </>
+  );
+}
