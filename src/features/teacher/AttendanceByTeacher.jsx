@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { CalendarDays, CalendarRange, Check, Download, MapPin, Upload, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
+import { CalendarDays, CalendarRange, Check, Download, MapPin, QrCode, Upload, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Dialog";
 import PageHeader from "@/components/ui/PageHeader";
 import { CardGridSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
@@ -34,35 +36,67 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
+function CheckInQrModal({ event, onClose }) {
+  const [dataUrl, setDataUrl] = useState(null);
+
+  useEffect(() => {
+    if (!event) return;
+    const url = `${window.location.origin}/studentlayout/checkin/${event._id}`;
+    QRCode.toDataURL(url, { width: 280, margin: 1 }).then(setDataUrl).catch(() => setDataUrl(null));
+  }, [event]);
+
+  return (
+    <Modal open={Boolean(event)} onClose={onClose} title="Check-in QR code" description={event?.title}>
+      <div className="flex flex-col items-center gap-4 text-center">
+        {event?.status !== "Ongoing" ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-800">
+            This code only works while the event is live. Mark it Ongoing first.
+          </p>
+        ) : null}
+        {dataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- locally generated data URL, not a remote image
+          <img src={dataUrl} alt={`Check-in QR code for ${event?.title}`} className="size-64 rounded-xl border border-line" />
+        ) : (
+          <div className="size-64 animate-pulse rounded-xl bg-mist" />
+        )}
+        <p className="text-[13px] text-muted">Volunteers scan this to self check-in. They still need to be on the event roster.</p>
+      </div>
+    </Modal>
+  );
+}
+
 function EventPicker({ events, onSelect }) {
   const eligible = sortEvents(events.filter((e) => e.status !== "Cancelled"));
+  const [qrEvent, setQrEvent] = useState(null);
   if (!eligible.length) {
     return <EmptyState icon={CalendarRange} title="No events assigned yet" description="Once a coordinator assigns you to an event, it appears here." />;
   }
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {eligible.map((event) => (
-        <li key={event._id}>
-          <button
-            type="button"
-            onClick={() => onSelect(event)}
-            className="flex h-full w-full flex-col rounded-xl border border-line bg-paper p-5 text-left transition-colors hover:border-ink"
-          >
-            <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} className="self-start" />
-            <p className="mt-3 text-[16px] font-semibold text-fg">{event.title}</p>
-            <ul className="mt-3 space-y-1.5 text-[13px] text-muted">
-              <li className="flex items-center gap-2">
-                <CalendarDays aria-hidden="true" className="size-3.5" /> {formatDate(event.date)}
-              </li>
-              <li className="flex items-center gap-2">
-                <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
-              </li>
-            </ul>
-            <span className="mt-auto pt-4 text-[13px] font-semibold text-brand-700">Take attendance →</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {eligible.map((event) => (
+          <li key={event._id} className="flex h-full flex-col rounded-xl border border-line bg-paper p-5">
+            <button type="button" onClick={() => onSelect(event)} className="flex flex-1 flex-col text-left">
+              <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} className="self-start" />
+              <p className="mt-3 text-[16px] font-semibold text-fg">{event.title}</p>
+              <ul className="mt-3 space-y-1.5 text-[13px] text-muted">
+                <li className="flex items-center gap-2">
+                  <CalendarDays aria-hidden="true" className="size-3.5" /> {formatDate(event.date)}
+                </li>
+                <li className="flex items-center gap-2">
+                  <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
+                </li>
+              </ul>
+              <span className="mt-4 text-[13px] font-semibold text-brand-700">Take attendance →</span>
+            </button>
+            <Button size="sm" variant="outline" icon={QrCode} className="mt-4 self-start" onClick={() => setQrEvent(event)}>
+              Check-in QR
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <CheckInQrModal event={qrEvent} onClose={() => setQrEvent(null)} />
+    </>
   );
 }
 
