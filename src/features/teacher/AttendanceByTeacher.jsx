@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarDays, CalendarRange, Check, MapPin, Users, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { CalendarDays, CalendarRange, Check, Download, MapPin, Upload, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -14,6 +14,25 @@ import api, { errorMessage } from "@/lib/api";
 import cx from "@/lib/cx";
 import { formatDate } from "@/lib/format";
 import { sortEvents, useMyEvents } from "./data";
+
+function parseCsv(text) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")));
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 function EventPicker({ events, onSelect }) {
   const eligible = sortEvents(events.filter((e) => e.status !== "Cancelled"));
@@ -56,6 +75,7 @@ function AttendanceSheet({ event, onClose }) {
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
+  const fileRef = useRef(null);
 
   const people = participants.data || [];
   const statusOf = (id) => status[id] || "Present";
@@ -66,6 +86,39 @@ function AttendanceSheet({ event, onClose }) {
 
   const setOne = (id, value) => setStatus((prev) => ({ ...prev, [id]: value }));
   const setAll = (value) => setStatus(Object.fromEntries(people.map((s) => [s._id, value])));
+
+  const exportRoster = () => {
+    downloadCsv(
+      `attendance-${event.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`,
+      [["name", "email", "status"], ...people.map((s) => [s.name, s.email || "", statusOf(s._id)])]
+    );
+  };
+
+  const importCsv = async (file) => {
+    const text = await file.text();
+    const rows = parseCsv(text);
+    const body = rows[0]?.[0]?.toLowerCase() === "name" ? rows.slice(1) : rows;
+
+    const byEmail = new Map(people.filter((s) => s.email).map((s) => [s.email.toLowerCase(), s]));
+    const byName = new Map(people.map((s) => [s.name.trim().toLowerCase(), s]));
+
+    let matched = 0;
+    const next = {};
+    body.forEach(([name, email, statusCell]) => {
+      const student = (email && byEmail.get(email.trim().toLowerCase())) || byName.get((name || "").trim().toLowerCase());
+      if (!student) return;
+      const value = /absent/i.test(statusCell || "") ? "Absent" : "Present";
+      next[student._id] = value;
+      matched += 1;
+    });
+
+    if (!matched) {
+      toast.error("No rows matched this event's volunteers. Check the name or email column.");
+      return;
+    }
+    setStatus((prev) => ({ ...prev, ...next }));
+    toast.success(`Matched ${matched} of ${body.length} rows. Review below, then save.`);
+  };
 
   const submit = async () => {
     setSaving(true);
@@ -115,13 +168,30 @@ function AttendanceSheet({ event, onClose }) {
         <div className="overflow-hidden rounded-xl border border-line bg-paper">
           <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
             <SearchInput value={query} onChange={setQuery} placeholder="Search volunteers" className="flex-1 sm:max-w-xs" />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => setAll("Present")}>
                 Mark all present
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setAll("Absent")}>
                 Mark all absent
               </Button>
+              <Button size="sm" variant="ghost" icon={Download} onClick={exportRoster}>
+                Export CSV
+              </Button>
+              <Button size="sm" variant="ghost" icon={Upload} onClick={() => fileRef.current?.click()}>
+                Import CSV
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) importCsv(file);
+                  e.target.value = "";
+                }}
+              />
             </div>
           </div>
           <ul className="divide-y divide-line">

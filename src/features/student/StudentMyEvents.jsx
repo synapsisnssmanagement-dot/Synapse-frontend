@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { CalendarDays, CalendarRange, Clock3, MapPin } from "lucide-react";
+import { CalendarDays, CalendarRange, Clock3, LayoutList, MapPin } from "lucide-react";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/DataTable";
 import DateBlock from "@/components/ui/DateBlock";
@@ -13,7 +13,9 @@ import { EmptyState, ErrorState } from "@/components/ui/States";
 import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
 import useResource from "@/hooks/useResource";
 import api from "@/lib/api";
+import cx from "@/lib/cx";
 import { formatDate } from "@/lib/format";
+import MonthCalendar from "@/components/shared/MonthCalendar";
 import { sortEvents } from "./data";
 
 const FILTERS = [
@@ -31,6 +33,7 @@ export default function StudentMyEvents() {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState(null);
+  const [view, setView] = useState("list");
 
   const all = useMemo(() => events.data || [], [events.data]);
   const counts = useMemo(() => {
@@ -51,7 +54,29 @@ export default function StudentMyEvents() {
 
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <Tabs id={tabsId} value={filter} onChange={setFilter} label="Filter events" tabs={FILTERS.map((f) => ({ ...f, count: counts[f.id] }))} className="flex-1" />
-        <SearchInput value={query} onChange={setQuery} placeholder="Search events" className="w-full lg:w-72" />
+        <div className="flex items-center gap-3">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search events" className="w-full lg:w-72" />
+          <div className="flex shrink-0 gap-1 rounded-lg border border-line p-1">
+            <button
+              type="button"
+              aria-pressed={view === "list"}
+              onClick={() => setView("list")}
+              className={cx("flex size-8 items-center justify-center rounded-md transition-colors", view === "list" ? "bg-ink text-white" : "text-fg-2 hover:bg-mist")}
+              aria-label="List view"
+            >
+              <LayoutList aria-hidden="true" className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "calendar"}
+              onClick={() => setView("calendar")}
+              className={cx("flex size-8 items-center justify-center rounded-md transition-colors", view === "calendar" ? "bg-ink text-white" : "text-fg-2 hover:bg-mist")}
+              aria-label="Calendar view"
+            >
+              <CalendarDays aria-hidden="true" className="size-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div {...tabPanelProps(tabsId, filter)}>
@@ -59,6 +84,12 @@ export default function StudentMyEvents() {
           <CardGridSkeleton count={4} />
         ) : events.status === "error" ? (
           <ErrorState error={events.error} onRetry={events.reload} />
+        ) : view === "calendar" ? (
+          rows.length ? (
+            <MonthCalendar events={rows} onSelectEvent={(e) => setOpenId(e.id)} />
+          ) : (
+            <EmptyState icon={CalendarRange} title={q ? "No matches" : "No events here"} description={q ? "Try a different name or place." : "When a coordinator adds you to a drive, it appears here."} />
+          )
         ) : rows.length ? (
           <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {rows.map((event) => (

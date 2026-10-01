@@ -12,6 +12,7 @@ import DateBlock from "@/components/ui/DateBlock";
 import { Modal } from "@/components/ui/Dialog";
 import { Textarea } from "@/components/ui/Field";
 import PageHeader from "@/components/ui/PageHeader";
+import Progress from "@/components/ui/Progress";
 import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import useResource from "@/hooks/useResource";
@@ -159,7 +160,17 @@ export default function Donation() {
               </ul>
               <div className="mt-auto pt-5">
                 <p className="tabular text-xl font-semibold text-fg">{formatCurrency(Number(event.totalCollected) || 0)}</p>
-                <p className="text-[12.5px] text-muted">raised so far</p>
+                {event.donationGoal ? (
+                  <Progress
+                    value={Number(event.totalCollected) || 0}
+                    max={event.donationGoal}
+                    size="sm"
+                    valueLabel={`of ${formatCurrency(event.donationGoal)} goal`}
+                    className="mt-2"
+                  />
+                ) : (
+                  <p className="text-[12.5px] text-muted">raised so far</p>
+                )}
                 <Button fullWidth className="mt-4" icon={HandCoins} disabled={!stripePromise} onClick={() => setGiving(event)}>
                   Donate
                 </Button>
