@@ -23,6 +23,7 @@ import {
   Quote,
   ScrollText,
   Sparkles,
+  Trophy,
   UserCheck,
   UserCircle2,
   UserRoundSearch,
@@ -172,6 +173,7 @@ export const ROLE_NAV = {
         items: [
           { label: "Announcements", href: "/studentlayout/announcement", icon: Megaphone },
           { label: "Event chat", href: "/studentlayout/chatstudent", icon: MessagesSquare },
+          { label: "Leaderboard", href: "/studentlayout/leaderboard", icon: Trophy },
         ],
       },
     ],
