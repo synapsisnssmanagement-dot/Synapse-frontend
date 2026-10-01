@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { GraduationCap, HeartHandshake, Search, Sparkles, Undo2 } from "lucide-react";
+import { Download, GraduationCap, HeartHandshake, Search, Sparkles, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/States";
 import useResource from "@/hooks/useResource";
 import api, { errorMessage, getList } from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
 import { formatNumber } from "@/lib/format";
 
 function SkillSearch({ onResults }) {
@@ -73,6 +74,13 @@ export default function ManageStudents() {
     }
   };
 
+  const exportCsv = () => {
+    downloadCsv("students.csv", [
+      ["name", "email", "department", "talents", "role"],
+      ...rows.map((s) => [s.name, s.email || "", s.department || "", Array.isArray(s.talents) ? s.talents.join("; ") : s.talents || "", s.role || "student"]),
+    ]);
+  };
+
   const columns = [
     { key: "name", header: "Name", sortable: true, primary: true, render: (row) => <Identity name={row.name} email={row.email} /> },
     { key: "department", header: "Department", sortable: true, render: (row) => row.department || "—" },
@@ -92,7 +100,14 @@ export default function ManageStudents() {
         title="Students"
         description="Every student at your institution. Make someone an NSS volunteer to include them in events, hours and levels."
         meta={list.data ? <span>{formatNumber(list.data.length)} students</span> : null}
-        actions={<SkillSearch onResults={(term, students) => setSkillFilter(students ? { term, students } : { term, students: [] })} />}
+        actions={
+          <div className="flex flex-wrap items-end gap-2">
+            <SkillSearch onResults={(term, students) => setSkillFilter(students ? { term, students } : { term, students: [] })} />
+            <Button variant="outline" icon={Download} onClick={exportCsv} disabled={!rows.length}>
+              Export CSV
+            </Button>
+          </div>
+        }
       />
 
       {skillFilter ? (

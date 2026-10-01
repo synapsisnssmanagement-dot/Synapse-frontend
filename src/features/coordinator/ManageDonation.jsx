@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, HandCoins, Lock, MapPin, Target, Unlock, Users } from "lucide-react";
+import { CalendarDays, Download, HandCoins, Lock, MapPin, Target, Unlock, Users } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -13,7 +13,8 @@ import Progress from "@/components/ui/Progress";
 import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import api, { errorMessage, getList } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { downloadCsv } from "@/lib/csv";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { participantCount } from "./data";
 import useResource from "@/hooks/useResource";
 
@@ -152,6 +153,13 @@ export default function ManageDonation() {
 
   const totalRaised = rows.reduce((sum, e) => sum + (Number(e.totalCollected) || 0), 0);
 
+  const exportCsv = () => {
+    downloadCsv("donations.csv", [
+      ["event", "date", "collected", "goal", "status"],
+      ...rows.map((e) => [e.title, formatDate(e.date), Number(e.totalCollected) || 0, Number(e.donationGoal) || 0, e.donationOpen ? "Open" : "Closed"]),
+    ]);
+  };
+
   return (
     <>
       <PageHeader
@@ -159,6 +167,11 @@ export default function ManageDonation() {
         title="Donations"
         description="Alumni can support any event where donations are open. Toggle it per event — closing it stops new gifts, not what's already given."
         meta={totalRaised ? <span className="tabular font-semibold text-fg">{formatCurrency(totalRaised)} raised across your events</span> : null}
+        actions={
+          <Button variant="outline" icon={Download} onClick={exportCsv} disabled={!rows.length}>
+            Export CSV
+          </Button>
+        }
       />
 
       {events.loading ? (

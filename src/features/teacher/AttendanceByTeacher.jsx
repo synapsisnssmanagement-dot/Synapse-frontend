@@ -13,28 +13,10 @@ import { CardGridSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import useResource from "@/hooks/useResource";
 import api, { errorMessage } from "@/lib/api";
+import { downloadCsv, parseCsv } from "@/lib/csv";
 import cx from "@/lib/cx";
 import { formatDate } from "@/lib/format";
 import { sortEvents, useMyEvents } from "./data";
-
-function parseCsv(text) {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")));
-}
-
-function downloadCsv(filename, rows) {
-  const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
 
 function CheckInQrModal({ event, onClose }) {
   const [dataUrl, setDataUrl] = useState(null);

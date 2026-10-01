@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Building2, CalendarRange, CheckCircle2, Quote, Users } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ArrowUpRight, Building2, CalendarRange, CheckCircle2, Clock3, HandCoins, Quote, Users } from "lucide-react";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CHART_COLORS, ChartLegend, ChartTooltip, axisProps, gridProps } from "@/components/charts/chartTheme";
 import Button from "@/components/ui/Button";
 import PageHeader, { Accent } from "@/components/ui/PageHeader";
@@ -13,7 +13,7 @@ import { EmptyState, ErrorState } from "@/components/ui/States";
 import useResource from "@/hooks/useResource";
 import api from "@/lib/api";
 import cx from "@/lib/cx";
-import { firstName, formatDate, formatNumber, greeting } from "@/lib/format";
+import { firstName, formatCurrency, formatDate, formatNumber, greeting } from "@/lib/format";
 import { PEOPLE, PEOPLE_ORDER, useDashboardStats } from "./people";
 
 function ReviewPanel({ stats }) {
@@ -154,6 +154,35 @@ function EventsPanel({ event = {} }) {
   );
 }
 
+function DonationChart({ donation = {} }) {
+  const data = (donation.trend || []).map((d) => ({ date: d.date, amount: d.amount }));
+  const any = data.some((d) => d.amount > 0);
+
+  return (
+    <Panel
+      title="Donations"
+      description="Last 7 days"
+      actions={<span className="tabular text-[13px] font-semibold text-fg">{formatCurrency(donation.total || 0)} all-time</span>}
+    >
+      {any ? (
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="date" {...axisProps} tickFormatter={(v) => formatDate(v, "short")} />
+              <YAxis {...axisProps} allowDecimals={false} />
+              <Tooltip content={<ChartTooltip labelFormatter={(v) => formatDate(v, "long")} />} cursor={{ fill: CHART_COLORS.mist }} />
+              <Bar dataKey="amount" name="Raised" fill={CHART_COLORS.brand} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <EmptyState size="sm" icon={HandCoins} title="No donations this week" description="Gifts from alumni will chart here as they come in." />
+      )}
+    </Panel>
+  );
+}
+
 function DepartmentPanel({ departments = [] }) {
   const top = departments.filter((d) => d._id).slice(0, 8);
   const max = Math.max(1, ...top.map((d) => d.count));
@@ -240,6 +269,8 @@ export default function AdminDashboard() {
             footnote={`${formatNumber(s.coordinator?.active || 0)} active`}
           />
           <StatCard align="bottom" label="Alumni" value={s.alumni?.total || 0} icon={PEOPLE.alumni.icon} footnote={`${formatNumber(s.alumni?.active || 0)} active`} />
+          <StatCard align="bottom" label="Hours contributed" value={formatNumber(s.hours?.total || 0)} icon={Clock3} footnote="across every institution" />
+          <StatCard align="bottom" label="Donations raised" value={formatCurrency(s.donation?.total || 0)} icon={HandCoins} footnote={`${formatNumber(s.donation?.count || 0)} gifts`} />
         </div>
       </div>
 
@@ -249,6 +280,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <DonationChart donation={s.donation} />
         <DepartmentPanel departments={s.student?.bydepartment} />
         <Panel title="Shortcuts" bodyClassName="p-2">
           <ul>
