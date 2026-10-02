@@ -16,7 +16,7 @@ export const PEOPLE = {
     title: "Students",
     icon: GraduationCap,
     queueIcon: UserCheck,
-    pendingHref: "/adminpanel/pendingstudent",
+    pendingHref: "/adminpanel/pending?role=student",
     directoryHref: "/adminpanel/allstudent",
     pending: {
       list: "/api/students/getallpendingstudent",
@@ -39,7 +39,7 @@ export const PEOPLE = {
     title: "Teachers",
     icon: Presentation,
     queueIcon: BadgeCheck,
-    pendingHref: "/adminpanel/pendingteacher",
+    pendingHref: "/adminpanel/pending?role=teacher",
     directoryHref: "/adminpanel/allteachers",
     pending: {
       list: "/api/teacher/pendingteacher",
@@ -62,7 +62,7 @@ export const PEOPLE = {
     title: "Coordinators",
     icon: Compass,
     queueIcon: ClipboardCheck,
-    pendingHref: "/adminpanel/pendingcoordinator",
+    pendingHref: "/adminpanel/pending?role=coordinator",
     directoryHref: "/adminpanel/allcoordinators",
     pending: {
       list: "/api/coordinator/getallpendingcoordinator",
@@ -85,7 +85,7 @@ export const PEOPLE = {
     title: "Alumni",
     icon: HeartHandshake,
     queueIcon: Award,
-    pendingHref: "/adminpanel/pendingalumni",
+    pendingHref: "/adminpanel/pending?role=alumni",
     directoryHref: "/adminpanel/allalumni",
     pending: {
       list: "/api/alumni/pending",

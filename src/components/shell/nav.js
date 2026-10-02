@@ -1,6 +1,5 @@
 import {
   Award,
-  BadgeCheck,
   Building2,
   CalendarCheck,
   CalendarPlus,
@@ -46,12 +45,7 @@ export const ROLE_NAV = {
       { label: "Overview", items: [{ label: "Dashboard", href: "/adminpanel", icon: LayoutGrid, exact: true }] },
       {
         label: "Approvals",
-        items: [
-          { label: "Pending students", href: "/adminpanel/pendingstudent", icon: UserCheck },
-          { label: "Pending teachers", href: "/adminpanel/pendingteacher", icon: BadgeCheck },
-          { label: "Pending coordinators", href: "/adminpanel/pendingcoordinator", icon: ClipboardCheck },
-          { label: "Pending alumni", href: "/adminpanel/pendingalumni", icon: Award },
-        ],
+        items: [{ label: "Pending approvals", href: "/adminpanel/pending", icon: UserCheck }],
       },
       {
         label: "Directory",

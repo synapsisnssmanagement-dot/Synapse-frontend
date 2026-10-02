@@ -7,7 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, ArrowLeft, Building2, Check, Circle, Mail, Phone, RotateCw, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import Button from "@/components/ui/Button";
-import { Input, PasswordInput, Select } from "@/components/ui/Field";
+import { Checkbox, Input, PasswordInput, Select } from "@/components/ui/Field";
 import { Accent } from "@/components/ui/PageHeader";
 import UploadZone from "@/components/ui/UploadZone";
 import useResource from "@/hooks/useResource";
@@ -89,7 +89,7 @@ const ROLE_CONFIG = {
 };
 
 const STEPS = ["Account", "Institution", "Verification"];
-const EMPTY = { name: "", email: "", phoneNumber: "", password: "", institutionId: "", department: "", talents: "", graduationYear: "" };
+const EMPTY = { name: "", email: "", phoneNumber: "", password: "", institutionId: "", department: "", talents: "", graduationYear: "", wantsVolunteer: false };
 
 function PasswordRules({ value }) {
   return (
@@ -167,7 +167,10 @@ export default function SignupForm({ role }) {
     fd.append("password", form.password);
     fd.append("department", form.department.trim());
     fd.append(config.institutionKey, form.institutionId);
-    if (role === "student") fd.append("talents", form.talents.trim());
+    if (role === "student") {
+      fd.append("talents", form.talents.trim());
+      fd.append("role", form.wantsVolunteer ? "volunteer" : "student");
+    }
     if (role === "alumni") fd.append("graduationYear", form.graduationYear);
     if (files.photo) fd.append("profileImage", files.photo);
     if (config.document && files.document) fd.append("verificationDocument", files.document);
@@ -342,14 +345,22 @@ export default function SignupForm({ role }) {
                   />
                 ) : null}
                 {role === "student" ? (
-                  <Input
-                    label="Talents and skills"
-                    name="talents"
-                    placeholder="e.g. photography, first aid, public speaking"
-                    hint="Optional. Coordinators use this to match you with the right drives."
-                    value={form.talents}
-                    onChange={update}
-                  />
+                  <>
+                    <Input
+                      label="Talents and skills"
+                      name="talents"
+                      placeholder="e.g. photography, first aid, public speaking"
+                      hint="Optional. Coordinators use this to match you with the right drives."
+                      value={form.talents}
+                      onChange={update}
+                    />
+                    <Checkbox
+                      label="I want to be an NSS volunteer"
+                      description="Volunteers can be assigned to events, log hours and earn certificates. You can also become one later from your profile."
+                      checked={form.wantsVolunteer}
+                      onChange={(e) => setForm((prev) => ({ ...prev, wantsVolunteer: e.target.checked }))}
+                    />
+                  </>
                 ) : null}
               </>
             ) : null}
