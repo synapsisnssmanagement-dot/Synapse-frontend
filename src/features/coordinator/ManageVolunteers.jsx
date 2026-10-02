@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarRange, UserMinus, UserPlus, Users } from "lucide-react";
+import { CalendarRange, Sparkles, TriangleAlert, UserMinus, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import Avatar from "@/components/ui/Avatar";
-import { StatusBadge } from "@/components/ui/Badge";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/DataTable";
 import { Select } from "@/components/ui/Field";
@@ -18,7 +18,62 @@ import cx from "@/lib/cx";
 import { formatDate } from "@/lib/format";
 import { sortEvents } from "./data";
 
-function VolunteerCard({ person, selected, onToggle, trailing }) {
+function Suggestions({ eventId, assignedIds, picked, onToggle, onPickTop }) {
+  const match = useResource(() => api.get(`/api/nss/events/${eventId}/match`).then((res) => res.data?.suggestions || []), [eventId]);
+  const top = (match.data || []).filter((s) => !assignedIds.has(String(s._id))).slice(0, 6);
+
+  if (match.loading) return <Skeleton className="h-40 w-full" />;
+  if (match.status === "error" || !top.length) return null;
+
+  return (
+    <Panel
+      title={
+        <span className="flex items-center gap-2">
+          <Sparkles aria-hidden="true" className="size-4 text-brand-700" /> Suggested for this event
+        </span>
+      }
+      description="Ranked by the skills it needs, who most needs NSS hours, and who's free that day."
+      actions={
+        <Button size="sm" variant="outline" onClick={() => onPickTop(top.filter((s) => !s.clash).map((s) => String(s._id)))}>
+          Select the top picks
+        </Button>
+      }
+      className="mb-6"
+    >
+      <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {top.map((s) => (
+          <li key={s._id}>
+            <VolunteerCard
+              person={s}
+              selected={picked.includes(String(s._id))}
+              onToggle={() => onToggle(String(s._id))}
+              trailing={
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="tabular rounded-sm bg-mint px-1.5 py-0.5 text-[11px] font-bold text-brand-700" title="Match score">
+                    {s.score}
+                  </span>
+                </span>
+              }
+              detail={
+                s.reasons.length ? (
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    {s.reasons.map((r) => (
+                      <Badge key={r} size="sm" tone={r.startsWith("Already") ? "warning" : "neutral"} icon={r.startsWith("Already") ? TriangleAlert : undefined}>
+                        {r}
+                      </Badge>
+                    ))}
+                  </span>
+                ) : null
+              }
+            />
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function VolunteerCard({ person, selected, onToggle, trailing, detail }) {
   return (
     <label
       className={cx(
@@ -31,6 +86,7 @@ function VolunteerCard({ person, selected, onToggle, trailing }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[14px] font-semibold text-fg">{person.name}</span>
         <span className="block truncate text-[12.5px] text-muted">{person.department || person.email}</span>
+        {detail}
       </span>
       {trailing}
     </label>
@@ -41,7 +97,7 @@ export default function ManageVolunteers() {
   const volunteers = useResource(() => getList("/api/coordinator/volunteers", "volunteers"), []);
   const events = useResource(() => getList("/api/coordinator/my-events", "events"), []);
   const [eventId, setEventId] = useState("");
-  const assigned = useResource(() => (eventId ? api.get(`/api/coordinator/events/${eventId}`).then((res) => res.data?.event?.participants || []) : Promise.resolve([])), [eventId], {
+  const assigned = useResource(() => (eventId ? api.get(`/api/events/participantsofevents/${eventId}`).then((res) => res.data?.participants || []) : Promise.resolve([])), [eventId], {
     enabled: Boolean(eventId),
   });
 
@@ -130,6 +186,17 @@ export default function ManageVolunteers() {
             </div>
             <SearchInput value={query} onChange={setQuery} placeholder="Search volunteers" className="w-full sm:w-64" />
           </div>
+
+          {!assigned.loading && assigned.status !== "error" ? (
+            <Suggestions
+              key={`${eventId}:${assignedList.length}`}
+              eventId={eventId}
+              assignedIds={assignedIds}
+              picked={addPicked}
+              onToggle={toggle(setAddPicked)}
+              onPickTop={(ids) => setAddPicked((prev) => [...new Set([...prev, ...ids])])}
+            />
+          ) : null}
 
           {volunteers.status === "error" || assigned.status === "error" ? (
             <ErrorState

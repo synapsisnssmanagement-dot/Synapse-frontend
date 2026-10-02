@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Bell, CalendarDays, CalendarPlus, CheckCircle2, Clock3, MapPin, Presentation, Users } from "lucide-react";
+import { ArrowLeft, Bell, CalendarDays, CalendarPlus, CheckCircle2, Clock3, HandHeart, MapPin, Presentation, Sparkles, Tent, Users } from "lucide-react";
 import { toast } from "sonner";
-import { StatusBadge } from "@/components/ui/Badge";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Field";
 import PageHeader from "@/components/ui/PageHeader";
@@ -15,7 +16,12 @@ import cx from "@/lib/cx";
 import { formatDate } from "@/lib/format";
 
 const STEPS = ["Details", "Date and place", "Cover photo", "Review"];
-const EMPTY = { title: "", description: "", date: "", hours: "", location: "", caption: "" };
+const EMPTY = { title: "", description: "", date: "", endDate: "", hours: "", location: "", caption: "", type: "regular", skills: "" };
+
+const TYPES = [
+  { id: "regular", label: "Regular drive", text: "A single-day activity: a cleanup, camp visit, awareness walk.", icon: HandHeart },
+  { id: "special_camp", label: "Special camp", text: "The multi-day NSS residential camp, with daily roll call and a camp diary.", icon: Tent },
+];
 
 function todayInputValue() {
   const d = new Date();
@@ -31,6 +37,10 @@ function validate(step, values) {
   }
   if (step === 1) {
     if (!values.date) errors.date = "Choose a date.";
+    if (values.type === "special_camp") {
+      if (!values.endDate) errors.endDate = "When does the camp end?";
+      else if (values.date && values.endDate < values.date) errors.endDate = "The camp can't end before it starts.";
+    }
     const hours = Number(values.hours);
     if (!values.hours || !Number.isFinite(hours) || hours <= 0 || hours > 24) errors.hours = "Enter the planned hours, between 1 and 24.";
     if (!values.location.trim()) errors.location = "Where is it happening?";
@@ -68,12 +78,29 @@ function Preview({ values, image }) {
         {values.caption && url ? <p className="absolute bottom-3 left-4 rounded-sm bg-ink/70 px-2 py-1 text-[12px] text-white">{values.caption}</p> : null}
       </div>
       <div className="p-6">
-        <StatusBadge status="upcoming" />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status="upcoming" />
+          {values.type === "special_camp" ? (
+            <Badge tone="dark" icon={Tent}>
+              Special camp
+            </Badge>
+          ) : null}
+        </div>
         <h3 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-ink">{values.title || "Untitled event"}</h3>
         <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-fg-2">{values.description}</p>
+        {values.skills.trim() ? (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {values.skills.split(",").map((s) => s.trim()).filter(Boolean).map((skill) => (
+              <Badge key={skill} tone="neutral" size="sm">
+                {skill}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
         <ul className="mt-5 grid gap-2.5 text-[14px] text-fg-2 sm:grid-cols-3">
           <li className="flex items-center gap-2">
             <CalendarDays aria-hidden="true" className="size-4 text-subtle" /> {formatDate(values.date, "long")}
+            {values.type === "special_camp" && values.endDate ? ` to ${formatDate(values.endDate, "long")}` : ""}
           </li>
           <li className="flex items-center gap-2">
             <Clock3 aria-hidden="true" className="size-4 text-subtle" /> {values.hours || "—"} hours
@@ -121,10 +148,19 @@ function Created({ event, onAnother }) {
   );
 }
 
-export default function CreateEvent() {
+function CreateEventForm() {
   const reduce = useReducedMotion();
+  const params = useSearchParams();
+  // Arriving from a community request pre-fills the drive from it.
+  const requestId = params.get("request");
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState(EMPTY);
+  const [values, setValues] = useState(() => ({
+    ...EMPTY,
+    title: params.get("title") || "",
+    description: params.get("description") || "",
+    location: params.get("location") || "",
+    date: params.get("date") && params.get("date") >= todayInputValue() ? params.get("date") : "",
+  }));
   const [image, setImage] = useState(null);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -145,6 +181,10 @@ export default function CreateEvent() {
     form.append("hours", values.hours);
     form.append("location", values.location.trim());
     form.append("caption", values.caption.trim());
+    form.append("type", values.type);
+    if (values.type === "special_camp" && values.endDate) form.append("endDate", values.endDate);
+    form.append("requiredSkills", values.skills);
+    if (requestId) form.append("requestId", requestId);
     if (image) form.append("images", image);
     try {
       const res = await api.post("/api/coordinator/createevents", form);
@@ -221,6 +261,40 @@ export default function CreateEvent() {
                 >
                   {step === 0 ? (
                     <>
+                      {requestId ? (
+                        <p className="flex items-start gap-3 rounded-lg border border-brand/25 bg-mint p-4 text-[14px] text-brand-700">
+                          <HandHeart aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                          Planning a drive for a community request. Publishing marks the request as accepted.
+                        </p>
+                      ) : null}
+                      <fieldset>
+                        <legend className="mb-2 text-[13px] font-semibold text-fg">Kind of event</legend>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {TYPES.map(({ id, label, text, icon: Icon }) => (
+                            <label
+                              key={id}
+                              className={cx(
+                                "flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-600",
+                                values.type === id ? "border-ink bg-canvas" : "border-line hover:border-line-strong"
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name="type"
+                                value={id}
+                                checked={values.type === id}
+                                onChange={update}
+                                className="sr-only"
+                              />
+                              <Icon aria-hidden="true" className={cx("mt-0.5 size-5 shrink-0", values.type === id ? "text-brand-700" : "text-subtle")} />
+                              <span>
+                                <span className="block text-[14px] font-semibold text-fg">{label}</span>
+                                <span className="mt-0.5 block text-[13px] leading-snug text-muted">{text}</span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
                       <Input
                         label="Event name"
                         name="title"
@@ -241,15 +315,48 @@ export default function CreateEvent() {
                         error={errors.description}
                         required
                       />
+                      <Input
+                        label="Skills needed"
+                        name="skills"
+                        leading={Sparkles}
+                        placeholder="e.g. first aid, photography, Malayalam"
+                        hint="Optional, comma-separated. Synapsis uses these to suggest the right volunteers."
+                        value={values.skills}
+                        onChange={update}
+                      />
                     </>
                   ) : null}
 
                   {step === 1 ? (
                     <>
                       <div className="grid gap-6 sm:grid-cols-2">
-                        <Input label="Date" name="date" type="date" min={todayInputValue()} leading={CalendarDays} value={values.date} onChange={update} error={errors.date} required />
                         <Input
-                          label="Planned hours"
+                          label={values.type === "special_camp" ? "Camp starts" : "Date"}
+                          name="date"
+                          type="date"
+                          min={todayInputValue()}
+                          leading={CalendarDays}
+                          value={values.date}
+                          onChange={update}
+                          error={errors.date}
+                          required
+                        />
+                        {values.type === "special_camp" ? (
+                          <Input
+                            label="Camp ends"
+                            name="endDate"
+                            type="date"
+                            min={values.date || todayInputValue()}
+                            leading={CalendarDays}
+                            hint="Usually seven days. Each day gets its own roll call."
+                            value={values.endDate}
+                            onChange={update}
+                            error={errors.endDate}
+                            required
+                          />
+                        ) : null}
+                        <Input
+                          label={values.type === "special_camp" ? "Planned hours per day" : "Planned hours"}
                           name="hours"
                           type="number"
                           inputMode="decimal"
@@ -313,5 +420,13 @@ export default function CreateEvent() {
         </div>
       )}
     </>
+  );
+}
+
+export default function CreateEvent() {
+  return (
+    <Suspense>
+      <CreateEventForm />
+    </Suspense>
   );
 }

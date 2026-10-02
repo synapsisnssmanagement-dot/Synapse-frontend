@@ -9,11 +9,13 @@ import {
   FileBarChart,
   FileText,
   GraduationCap,
+  HandHelping,
   HandCoins,
   HeartHandshake,
   ImagePlus,
   Images,
   LayoutGrid,
+  Medal,
   Megaphone,
   MessageCircle,
   MessagesSquare,
@@ -94,11 +96,18 @@ export const ROLE_NAV = {
       {
         label: "Recognition",
         items: [
+          { label: "NSS certificates", href: "/coordinatorlayout/eligibility", icon: Medal },
           { label: "Grace marks", href: "/coordinatorlayout/recommendgracemark", icon: Award },
           { label: "Donations", href: "/coordinatorlayout/ManageDonation", icon: HandCoins },
         ],
       },
-      { label: "Community", items: [{ label: "Event chat", href: "/coordinatorlayout/chat", icon: MessagesSquare }] },
+      {
+        label: "Community",
+        items: [
+          { label: "Help requests", href: "/coordinatorlayout/requests", icon: HandHelping },
+          { label: "Event chat", href: "/coordinatorlayout/chat", icon: MessagesSquare },
+        ],
+      },
     ],
   },
   teacher: {

@@ -1,19 +1,20 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
-import { CalendarDays, CalendarPlus, CalendarRange, Clock3, MapPin, Pencil, Play, Presentation, Square, Users } from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { CalendarDays, CalendarPlus, CalendarRange, Clock3, MapPin, Pencil, Play, Plus, Presentation, Radio, Sprout, Square, Tent, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/DataTable";
 import DateBlock from "@/components/ui/DateBlock";
-import { Drawer } from "@/components/ui/Dialog";
+import { Drawer, Modal } from "@/components/ui/Dialog";
 import { Input, Textarea } from "@/components/ui/Field";
 import Identity from "@/components/ui/Identity";
 import PageHeader from "@/components/ui/PageHeader";
 import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
+import { useSocket } from "@/context/SocketContext";
 import api, { errorMessage } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/format";
 import { isPast, participantCount, presentCount, sortEvents, teacherCount, useMyEvents } from "./data";
@@ -149,7 +150,84 @@ function EditDrawer({ event, open, onClose, onSaved }) {
   );
 }
 
-function DetailDrawer({ event, open, onClose, onEdit, lifecycle }) {
+const IMPACT_PRESETS = [
+  { metric: "People reached", unit: "people" },
+  { metric: "Trees planted", unit: "trees" },
+  { metric: "Blood collected", unit: "units" },
+  { metric: "Waste collected", unit: "kg" },
+  { metric: "Meals served", unit: "meals" },
+  { metric: "Students taught", unit: "students" },
+];
+
+function ImpactModal({ event, onClose, onSaved }) {
+  const [rows, setRows] = useState(() => (event?.impact?.length ? event.impact.map((i) => ({ ...i, value: String(i.value) })) : [{ metric: "", value: "", unit: "" }]));
+  const [saving, setSaving] = useState(false);
+
+  const set = (index, key, value) => setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
+  const addPreset = (preset) =>
+    setRows((prev) => [...prev.filter((r) => r.metric.trim() || r.value), { ...preset, value: "" }]);
+
+  const save = async (e) => {
+    e.preventDefault();
+    const impact = rows.filter((r) => r.metric.trim() || r.value).map((r) => ({ metric: r.metric.trim(), value: Number(r.value), unit: r.unit.trim() }));
+    if (impact.some((r) => !r.metric || !Number.isFinite(r.value) || r.value < 0)) {
+      toast.error("Each outcome needs a name and a number.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.put(`/api/nss/events/${event._id}/impact`, { impact });
+      onSaved({ ...event, impact: res.data?.impact || impact });
+      toast.success("Impact recorded. It now shows on your public impact page.");
+    } catch (error) {
+      toast.error(errorMessage(error, "We couldn't save the impact."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={Boolean(event)} onClose={onClose} eyebrow="Impact" title={event?.title || ""} description="What did this drive achieve? These numbers feed your annual report and public impact page.">
+      <form onSubmit={save} className="space-y-4">
+        <div className="flex flex-wrap gap-1.5">
+          {IMPACT_PRESETS.map((p) => (
+            <button
+              key={p.metric}
+              type="button"
+              onClick={() => addPreset(p)}
+              className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12.5px] font-medium text-fg-2 hover:border-ink hover:text-ink"
+            >
+              <Plus aria-hidden="true" className="size-3" /> {p.metric}
+            </button>
+          ))}
+        </div>
+        <ul className="space-y-2">
+          {rows.map((r, i) => (
+            <li key={i} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_auto] items-end gap-2">
+              <Input label={i === 0 ? "Outcome" : undefined} aria-label="Outcome" placeholder="e.g. Trees planted" value={r.metric} onChange={(e) => set(i, "metric", e.target.value)} />
+              <Input label={i === 0 ? "Number" : undefined} aria-label="Number" type="number" min="0" inputMode="decimal" value={r.value} onChange={(e) => set(i, "value", e.target.value)} />
+              <Input label={i === 0 ? "Unit" : undefined} aria-label="Unit" placeholder="trees" value={r.unit} onChange={(e) => set(i, "unit", e.target.value)} />
+              <Button type="button" variant="ghost" size="sm" icon={Trash2} aria-label="Remove outcome" onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))} />
+            </li>
+          ))}
+        </ul>
+        <Button type="button" variant="ghost" size="sm" icon={Plus} onClick={() => setRows((prev) => [...prev, { metric: "", value: "", unit: "" }])}>
+          Add another
+        </Button>
+        <div className="flex justify-end gap-2 border-t border-line pt-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving}>
+            Save impact
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function DetailDrawer({ event, open, onClose, onEdit, onImpact, lifecycle }) {
   const volunteers = (event?.participants || []).filter((p) => p && typeof p === "object");
   const teachers = (event?.assignedTeacher || []).filter((t) => t && typeof t === "object");
   const cover = event?.images?.[0]?.url;
@@ -164,6 +242,21 @@ function DetailDrawer({ event, open, onClose, onEdit, lifecycle }) {
       footer={
         event ? (
           <>
+            {event.type === "special_camp" ? (
+              <Button variant="outline" icon={Tent} href={`/coordinatorlayout/camp/${event._id}`}>
+                Camp
+              </Button>
+            ) : null}
+            {event.status === "Upcoming" || event.status === "Ongoing" ? (
+              <Button variant="outline" icon={Radio} href={`/coordinatorlayout/live/${event._id}`}>
+                Live screen
+              </Button>
+            ) : null}
+            {event.status === "Completed" ? (
+              <Button variant="outline" icon={Sprout} onClick={() => onImpact(event)}>
+                {event.impact?.length ? "Edit impact" : "Record impact"}
+              </Button>
+            ) : null}
             {event.status !== "Completed" ? (
               <Button variant="outline" icon={Pencil} onClick={() => onEdit(event)}>
                 Edit
@@ -192,10 +285,15 @@ function DetailDrawer({ event, open, onClose, onEdit, lifecycle }) {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} />
             {event.donationOpen ? <Badge tone="info">Donations open</Badge> : null}
+            {event.type === "special_camp" ? (
+              <Badge tone="dark" icon={Tent}>
+                Special camp
+              </Badge>
+            ) : null}
           </div>
           <dl className="grid gap-4 sm:grid-cols-2">
             {[
-              ["Date", formatDate(event.date, "long")],
+              ["Date", event.type === "special_camp" && event.endDate ? `${formatDate(event.date, "long")} to ${formatDate(event.endDate, "long")}` : formatDate(event.date, "long")],
               ["Location", event.location],
               ["Hours", event.calculatedHours ? `${event.calculatedHours} recorded (${event.hours} planned)` : `${event.hours} planned`],
               ["Attendance", `${presentCount(event)} present of ${participantCount(event)} assigned`],
@@ -208,6 +306,33 @@ function DetailDrawer({ event, open, onClose, onEdit, lifecycle }) {
               </div>
             ))}
           </dl>
+          {event.impact?.length ? (
+            <section>
+              <h3 className="eyebrow mb-3 text-muted">Impact</h3>
+              <ul className="grid gap-3 sm:grid-cols-3">
+                {event.impact.map((i) => (
+                  <li key={i.metric} className="rounded-lg border border-brand/25 bg-mint p-4">
+                    <p className="tabular text-2xl font-semibold tracking-[-0.03em] text-ink">
+                      {formatNumber(i.value)} <span className="text-[13px] font-medium text-muted">{i.unit}</span>
+                    </p>
+                    <p className="mt-1 text-[13px] text-brand-700">{i.metric}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {event.requiredSkills?.length ? (
+            <section>
+              <h3 className="eyebrow mb-3 text-muted">Skills needed</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {event.requiredSkills.map((skill) => (
+                  <Badge key={skill} tone="neutral">
+                    {skill}
+                  </Badge>
+                ))}
+              </div>
+            </section>
+          ) : null}
           {event.description ? (
             <section>
               <h3 className="eyebrow mb-3 text-muted">About</h3>
@@ -262,8 +387,19 @@ export default function MyEvents() {
   const [openId, setOpenId] = useState(null);
   const [editing, setEditing] = useState({ event: null, key: 0 });
 
+  const [impactFor, setImpactFor] = useState(null);
   const replace = (updated) => events.mutate((list) => (list || []).map((e) => (e._id === updated._id ? { ...e, ...updated } : e)));
   const lifecycle = useEventLifecycle(replace);
+  const socket = useSocket();
+  const { mutate } = events;
+
+  // Another coordinator (or tab) starting or completing an event updates this list live.
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onStatus = ({ eventId, status }) => mutate((list) => (list || []).map((e) => (e._id === eventId ? { ...e, status } : e)));
+    socket.on("event:status", onStatus);
+    return () => socket.off("event:status", onStatus);
+  }, [socket, mutate]);
 
   const all = useMemo(() => events.data || [], [events.data]);
   const counts = useMemo(() => {
@@ -338,6 +474,16 @@ export default function MyEvents() {
         onClose={() => setOpenId(null)}
         lifecycle={lifecycle}
         onEdit={(event) => setEditing((prev) => ({ event, key: prev.key + 1 }))}
+        onImpact={setImpactFor}
+      />
+      <ImpactModal
+        key={impactFor?._id || "none"}
+        event={impactFor}
+        onClose={() => setImpactFor(null)}
+        onSaved={(updated) => {
+          replace(updated);
+          setImpactFor(null);
+        }}
       />
       <EditDrawer
         key={editing.key}

@@ -56,6 +56,11 @@ export default function SiteFooter({ links }) {
                     Event album
                   </Link>
                 </li>
+                <li>
+                  <Link href="/request-help" className="link-draw text-[15px] text-on-dark/80 hover:text-white">
+                    Request help
+                  </Link>
+                </li>
               </ul>
             </div>
           </nav>

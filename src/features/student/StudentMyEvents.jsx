@@ -1,14 +1,14 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { CalendarDays, CalendarRange, Clock3, LayoutList, MapPin } from "lucide-react";
-import { StatusBadge } from "@/components/ui/Badge";
+import { CalendarDays, CalendarRange, CheckCircle2, CircleDashed, Clock3, LayoutList, MapPin, NotebookPen, Tent, XCircle } from "lucide-react";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/DataTable";
 import DateBlock from "@/components/ui/DateBlock";
 import { Drawer } from "@/components/ui/Dialog";
 import Identity from "@/components/ui/Identity";
 import PageHeader from "@/components/ui/PageHeader";
-import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { CardGridSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import Tabs, { tabPanelProps } from "@/components/ui/Tabs";
 import useResource from "@/hooks/useResource";
@@ -24,6 +24,104 @@ const FILTERS = [
   { id: "Ongoing", label: "Live" },
   { id: "Completed", label: "Completed" },
 ];
+
+const isCamp = (e) => e?.type === "special_camp";
+
+function dateRange(e, style = "medium") {
+  if (isCamp(e) && e.endDate) return `${formatDate(e.date, "short")} – ${formatDate(e.endDate, style)}`;
+  return formatDate(e.date, style === "medium" ? "medium" : "long");
+}
+
+function CampBadge({ size }) {
+  return (
+    <Badge tone="dark" icon={Tent} size={size}>
+      Special camp
+    </Badge>
+  );
+}
+
+const DAY_STATE = {
+  present: { Icon: CheckCircle2, text: "Present", cls: "border-brand/25 bg-mint text-brand-700" },
+  absent: { Icon: XCircle, text: "Absent", cls: "border-red-200 bg-red-50 text-red-700" },
+  pending: { Icon: CircleDashed, text: "Not recorded", cls: "border-line bg-canvas text-muted" },
+};
+
+function CampSection({ eventId }) {
+  const camp = useResource(() => api.get(`/api/nss/events/${eventId}/camp`).then((res) => res.data?.camp || null), [eventId]);
+
+  if (camp.loading) {
+    return (
+      <div role="status" aria-busy="true" className="space-y-3">
+        <span className="sr-only">Loading camp details</span>
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+  if (camp.status === "error") return <ErrorState size="sm" title="We couldn't load the camp" error={camp.error} onRetry={camp.reload} />;
+
+  const days = camp.data?.days || [];
+  const diary = [...(camp.data?.diary || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const attended = days.filter((d) => d.present === true).length;
+
+  return (
+    <>
+      <section aria-labelledby="camp-days-title">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 id="camp-days-title" className="eyebrow text-muted">
+            Camp attendance
+          </h3>
+          {days.length ? (
+            <p className="tabular text-[13px] font-semibold text-fg">
+              Attended {attended} of {days.length} days
+            </p>
+          ) : null}
+        </div>
+        {days.length ? (
+          <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {days.map((d, i) => {
+              const st = DAY_STATE[!d.recorded || d.present == null ? "pending" : d.present ? "present" : "absent"];
+              return (
+                <li key={d.date || i} className={cx("rounded-lg border px-3 py-2.5", st.cls)}>
+                  <p className="text-[11.5px] font-semibold uppercase tracking-wide opacity-80">Day {i + 1}</p>
+                  <p className="text-[13px] font-semibold">{formatDate(d.date, "short")}</p>
+                  <p className="mt-1 flex items-center gap-1 text-[12.5px]">
+                    <st.Icon aria-hidden="true" className="size-3.5 shrink-0" /> {st.text}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="text-[13.5px] text-muted">Camp days will appear here once the camp is scheduled.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="camp-diary-title">
+        <h3 id="camp-diary-title" className="eyebrow mb-3 text-muted">
+          Camp diary
+        </h3>
+        {diary.length ? (
+          <ul className="space-y-3">
+            {diary.map((entry) => (
+              <li key={entry._id} className="rounded-lg border border-line p-4">
+                <p className="text-[14.5px] font-semibold text-fg">{entry.title}</p>
+                <p className="mt-0.5 text-[12.5px] text-muted">
+                  {entry.authorName ? `${entry.authorName} · ` : ""}
+                  {formatDate(entry.date)}
+                </p>
+                {entry.body ? <p className="mt-3 whitespace-pre-line text-[14px] leading-relaxed text-fg-2">{entry.body}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState size="sm" icon={NotebookPen} title="No diary entries yet" description="Notes from each camp day are posted here by your coordinators." />
+        )}
+      </section>
+    </>
+  );
+}
 
 const asList = (value) => (Array.isArray(value) ? value : value ? [value] : []);
 
@@ -102,11 +200,19 @@ export default function StudentMyEvents() {
                   <div className="flex items-start gap-3">
                     <DateBlock date={event.date} size="sm" />
                     <div className="min-w-0 flex-1">
-                      <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+                      <div className="flex flex-wrap gap-1.5">
+                        <StatusBadge status={event.status} label={event.status === "Ongoing" ? "Live" : undefined} size="sm" />
+                        {isCamp(event) ? <CampBadge size="sm" /> : null}
+                      </div>
                       <p className="mt-2 text-[15px] font-semibold leading-snug text-fg">{event.title}</p>
                     </div>
                   </div>
                   <ul className="mt-4 space-y-1.5 text-[13px] text-muted">
+                    {isCamp(event) && event.endDate ? (
+                      <li className="flex items-center gap-2">
+                        <CalendarRange aria-hidden="true" className="size-3.5" /> {dateRange(event)}
+                      </li>
+                    ) : null}
                     <li className="flex items-center gap-2">
                       <MapPin aria-hidden="true" className="size-3.5" /> {event.location || "No location"}
                     </li>
@@ -130,10 +236,13 @@ export default function StudentMyEvents() {
       <Drawer open={Boolean(open)} onClose={() => setOpenId(null)} eyebrow="Event" title={open?.title || ""} size="lg">
         {open ? (
           <div className="space-y-8">
-            <StatusBadge status={open.status} label={open.status === "Ongoing" ? "Live" : undefined} />
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge status={open.status} label={open.status === "Ongoing" ? "Live" : undefined} />
+              {isCamp(open) ? <CampBadge /> : null}
+            </div>
             <ul className="space-y-2.5 text-[14.5px] text-fg-2">
               <li className="flex items-center gap-3">
-                <CalendarDays aria-hidden="true" className="size-4 text-subtle" /> {formatDate(open.date, "long")}
+                <CalendarDays aria-hidden="true" className="size-4 text-subtle" /> {isCamp(open) && open.endDate ? dateRange(open, "long") : formatDate(open.date, "long")}
               </li>
               <li className="flex items-center gap-3">
                 <MapPin aria-hidden="true" className="size-4 text-subtle" /> {open.location || "No location"}
@@ -143,6 +252,7 @@ export default function StudentMyEvents() {
               </li>
             </ul>
             {open.description ? <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg-2">{open.description}</p> : null}
+            {isCamp(open) ? <CampSection eventId={open.id} /> : null}
             {[
               ["Teachers", asList(open.teacher)],
               ["Coordinator", asList(open.coordinator)],

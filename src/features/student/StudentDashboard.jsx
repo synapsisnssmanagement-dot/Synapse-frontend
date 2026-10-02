@@ -14,6 +14,7 @@ import { EmptyState, ErrorState } from "@/components/ui/States";
 import useResource from "@/hooks/useResource";
 import api from "@/lib/api";
 import { firstName, formatNumber, greeting } from "@/lib/format";
+import NssProgress from "./NssProgress";
 import { levelProgress, sortEvents, useStudentProfile } from "./data";
 
 function Journey({ hours }) {
@@ -91,6 +92,10 @@ export default function StudentDashboard() {
           <StatCard align="bottom" label="Planned hours" value={stats.totalHours || 0} unit="h" icon={Clock3} footnote="Across all your events" />
           <StatCard align="bottom" label="Grace marks" value={stats.graceMarks || 0} icon={Award} />
         </div>
+      </div>
+
+      <div className="mt-4">
+        <NssProgress />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">

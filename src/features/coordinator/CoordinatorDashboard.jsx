@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, ArrowUpRight, CalendarPlus, CalendarRange, CheckCircle2, Clock3, Info, MapPin, Presentation, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarPlus, CalendarRange, CheckCircle2, Clock3, Info, MapPin, Presentation, Sparkles, Sprout, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CHART_COLORS, ChartLegend, ChartTooltip, axisProps, gridProps } from "@/components/charts/chartTheme";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -313,9 +313,16 @@ export default function CoordinatorDashboard() {
         }
         description="What is happening in your unit, what needs you, and the difference it is making."
         actions={
-          <Button href="/coordinatorlayout/createevent" icon={CalendarPlus}>
-            Create event
-          </Button>
+          <>
+            {profile.data?.institution ? (
+              <Button href={`/impact/${profile.data.institution}`} variant="outline" icon={Sprout}>
+                Public impact page
+              </Button>
+            ) : null}
+            <Button href="/coordinatorlayout/createevent" icon={CalendarPlus}>
+              Create event
+            </Button>
+          </>
         }
       />
 

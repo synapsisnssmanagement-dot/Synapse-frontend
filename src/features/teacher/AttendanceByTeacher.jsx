@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { CalendarDays, CalendarRange, Check, Download, MapPin, QrCode, Upload, Users, X } from "lucide-react";
+import { CalendarDays, CalendarRange, Check, Download, MapPin, QrCode, Radio, Tent, Upload, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -71,9 +71,21 @@ function EventPicker({ events, onSelect }) {
               </ul>
               <span className="mt-4 text-[13px] font-semibold text-brand-700">Take attendance →</span>
             </button>
-            <Button size="sm" variant="outline" icon={QrCode} className="mt-4 self-start" onClick={() => setQrEvent(event)}>
-              Check-in QR
-            </Button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" icon={QrCode} onClick={() => setQrEvent(event)}>
+                Check-in QR
+              </Button>
+              {event.status !== "Completed" ? (
+                <Button size="sm" variant="ghost" icon={Radio} href={`/teacherLayout/live/${event._id}`}>
+                  Live screen
+                </Button>
+              ) : null}
+              {event.type === "special_camp" ? (
+                <Button size="sm" variant="ghost" icon={Tent} href={`/teacherLayout/camp/${event._id}`}>
+                  Camp roll call
+                </Button>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
