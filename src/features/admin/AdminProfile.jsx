@@ -59,6 +59,7 @@ function ProfileForm({ admin, onSaved }) {
       localStorage.setItem("name", payload.name);
       localStorage.setItem("email", payload.email);
       toast.success("Profile saved.");
+      window.dispatchEvent(new Event("synapsis:profile-updated"));
       setValues((prev) => ({ ...prev, password: "" }));
       onSaved({ ...admin, ...payload });
     } catch (error) {

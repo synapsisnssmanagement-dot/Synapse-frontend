@@ -73,7 +73,7 @@ export default function Sidebar({ config, pathname, collapsed = false, onToggle,
           <div className="flex flex-col items-center gap-1">
             <IconButton variant="dark" label="Expand sidebar" icon={PanelLeftOpen} onClick={onToggle} />
             <Link href={config.profile} aria-label="Your profile" title="Your profile" className="rounded-full p-1">
-              <Avatar name={user.name} size="sm" />
+              <Avatar src={user.photo} name={user.name} size="sm" />
             </Link>
             <IconButton variant="dark" label="Sign out" icon={LogOut} onClick={onLogout} />
           </div>
@@ -87,7 +87,7 @@ export default function Sidebar({ config, pathname, collapsed = false, onToggle,
                 pathname.startsWith(config.profile) && "bg-white/[0.07]"
               )}
             >
-              <Avatar name={user.name} size="sm" />
+              <Avatar src={user.photo} name={user.name} size="sm" />
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-semibold text-white">{user.name || "Your profile"}</span>
                 <span className="block truncate text-[11.5px] text-on-dark/45">{user.email || config.label}</span>

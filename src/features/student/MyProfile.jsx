@@ -61,6 +61,7 @@ function ProfileForm({ student, onSaved }) {
       const saved = res.data?.student || {};
       localStorage.setItem("name", values.name.trim());
       toast.success("Profile saved.");
+      window.dispatchEvent(new Event("synapsis:profile-updated"));
       onSaved({ ...student, ...saved, profileImage: saved.profileImage ? { url: saved.profileImage } : student.profileImage });
       setPhoto(null);
     } catch (error) {

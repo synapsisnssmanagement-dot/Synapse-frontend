@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { IconButton } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/States";
+import { useSocket } from "@/context/SocketContext";
 import useResource from "@/hooks/useResource";
 import api, { errorMessage } from "@/lib/api";
 import cx from "@/lib/cx";
@@ -25,6 +26,19 @@ export default function NotificationsMenu({ viewAllHref }) {
   const resource = useResource(() => api.get("/api/notification").then((res) => res.data?.notifications || []), []);
   const notifications = resource.data || [];
   const unread = notifications.filter((n) => !n.read).length;
+  const socket = useSocket();
+  const { mutate } = resource;
+
+  // New notifications arrive over the socket the moment they're created.
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onNew = (notification) => {
+      mutate((list) => (list || []).some((n) => n._id === notification._id) ? list : [notification, ...(list || [])]);
+      toast(notification.title, { description: notification.message });
+    };
+    socket.on("notification:new", onNew);
+    return () => socket.off("notification:new", onNew);
+  }, [socket, mutate]);
 
   useEffect(() => {
     if (!open) return undefined;

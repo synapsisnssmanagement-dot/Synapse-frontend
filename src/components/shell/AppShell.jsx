@@ -11,6 +11,7 @@ import { IconButton } from "@/components/ui/Button";
 import { useDialogBehaviour, useIsClient } from "@/components/ui/Dialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import useAuthGuard from "@/hooks/useAuthGuard";
+import api from "@/lib/api";
 import { logout } from "@/utils/auth";
 import cx from "@/lib/cx";
 import CommandPalette from "./CommandPalette";
@@ -89,7 +90,29 @@ function Workspace({ config, children }) {
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSE_KEY) === "1");
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [user] = useState(() => ({ name: readStored("name") || "", email: readStored("email") || "" }));
+  const [user, setUser] = useState(() => ({ name: readStored("name") || "", email: readStored("email") || "", photo: null }));
+
+  // Stored name is only a first-paint placeholder; the server has the real
+  // name and photo (and profile pages fire this event after a save).
+  useEffect(() => {
+    const load = () =>
+      api
+        .get("/api/auth/me")
+        .then((res) => {
+          const me = res.data?.user;
+          if (!me) return;
+          setUser({ name: me.name || "", email: me.email || "", photo: me.photo || null });
+          try {
+            if (me.name) window.localStorage.setItem("name", me.name);
+          } catch {
+            // Cache only.
+          }
+        })
+        .catch(() => {});
+    load();
+    window.addEventListener("synapsis:profile-updated", load);
+    return () => window.removeEventListener("synapsis:profile-updated", load);
+  }, []);
   const [isMac] = useState(() => /Mac|iPhone|iPad/.test(window.navigator.platform || window.navigator.userAgent));
 
   const current = findCurrent(config, pathname);
@@ -174,7 +197,7 @@ function Workspace({ config, children }) {
           <IconButton label="Jump to a page" icon={Search} onClick={() => setPaletteOpen(true)} className="md:hidden" />
           {config.notifications ? <NotificationsMenu viewAllHref={config.announcements} /> : null}
           <Link href={config.profile} aria-label="Your profile" className="ml-1 rounded-full">
-            <Avatar name={user.name} size="sm" />
+            <Avatar src={user.photo} name={user.name} size="sm" />
           </Link>
         </header>
 

@@ -55,6 +55,7 @@ function ProfileForm({ teacher, onSaved }) {
     try {
       const res = await api.put("/api/teacher/profile", form);
       toast.success("Profile saved.");
+      window.dispatchEvent(new Event("synapsis:profile-updated"));
       localStorage.setItem("name", values.name.trim());
       localStorage.setItem("email", values.email.trim());
       onSaved(res.data?.teacher || { ...teacher, ...values });

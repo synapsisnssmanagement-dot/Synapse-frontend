@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -13,30 +13,20 @@ import { API_URL } from "@/utils/config";
 import cx from "@/lib/cx";
 import AuthLayout from "../auth/AuthLayout";
 
-// One request per attempt: the backend's login rate limit is shared across every
-// role's endpoint, so probing all five would lock out legitimate users.
-const ROLES = [
-  { id: "student", label: "Student", endpoint: "/api/students/studentlogin", home: "/studentlayout/dashboard", key: "student" },
-  { id: "teacher", label: "Teacher", endpoint: "/api/teacher/login", home: "/teacherLayout", key: "teacher" },
-  { id: "coordinator", label: "Coordinator", endpoint: "/api/coordinator/logincoordinator", home: "/coordinatorlayout", key: "coordinator" },
-  { id: "alumni", label: "Alumni", endpoint: "/api/alumni/login", home: "/alumnilayout/dashboard", key: "alumni" },
-  { id: "admin", label: "Admin", endpoint: "/api/admin/login", home: "/adminpanel", key: "admin" },
-];
+// The backend works out the account type from the email, so there's no role
+// to pick; HOME maps the returned workspace to where it lives.
+const HOME = {
+  student: "/studentlayout/dashboard",
+  teacher: "/teacherLayout",
+  coordinator: "/coordinatorlayout",
+  alumni: "/alumnilayout/dashboard",
+  admin: "/adminpanel",
+};
 
-const LAST_ROLE_KEY = "synapsis.lastRole";
 const OAUTH_ERRORS = {
   notregistered: "There is no Synapsis account for that Google address. Sign up first, then use Google to sign in.",
   invalidrole: "We couldn't work out which workspace to open. Please sign in with your email instead.",
 };
-
-const noSubscribe = () => () => {};
-function readLastRole() {
-  try {
-    return window.localStorage.getItem(LAST_ROLE_KEY);
-  } catch {
-    return null;
-  }
-}
 
 function GoogleMark() {
   return (
@@ -51,55 +41,50 @@ function GoogleMark() {
 
 export default function Login() {
   const searchParams = useSearchParams();
-  // Server renders the default; the remembered role applies after hydration without a mismatch.
-  const storedRole = useSyncExternalStore(noSubscribe, readLastRole, () => null);
-  const [chosenRole, setRole] = useState(null);
-  const role = chosenRole || (ROLES.some((r) => r.id === storedRole) ? storedRole : "student");
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Only set when one email+password opens more than one account.
+  const [choices, setChoices] = useState(null);
   const oauthError = searchParams.get("error");
   const bannerMessage = error || (oauthError ? OAUTH_ERRORS[oauthError.toLowerCase()] || oauthError : "");
-
-  const current = ROLES.find((r) => r.id === role);
 
   const update = (event) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
     if (error) setError("");
+    if (choices) setChoices(null);
   };
 
-  const submit = async (event) => {
-    event.preventDefault();
+  const signIn = async (workspace) => {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post(current.endpoint, { email: form.email.trim(), password: form.password });
-      const { success, token } = res.data || {};
-      if (!success || !token) throw new Error("missing token");
+      const res = await api.post("/api/auth/login", { email: form.email.trim(), password: form.password, workspace });
+      const { token, user } = res.data || {};
+      if (!token || !user) throw new Error("missing token");
 
-      const account = res.data[current.key] || res.data.user || {};
       localStorage.setItem("token", token);
-      localStorage.setItem("role", current.id);
-      localStorage.setItem("email", account.email || res.data.email || form.email.trim());
-      const name = account.name || res.data.name;
-      if (name) localStorage.setItem("name", name);
+      localStorage.setItem("role", user.role);
+      localStorage.setItem("email", user.email || form.email.trim());
+      if (user.name) localStorage.setItem("name", user.name);
       else localStorage.removeItem("name");
-      try {
-        localStorage.setItem(LAST_ROLE_KEY, current.id);
-      } catch {
-        // Preference only.
-      }
 
       toast.success("Signed in. Opening your workspace.");
       // Full reload so the socket connection picks up the new session.
-      window.location.assign(current.home);
+      window.location.assign(HOME[user.role] || "/");
     } catch (err) {
-      const status = err.response?.status;
-      if (status === 404) setError(`We couldn't find a ${current.label.toLowerCase()} account with that email. Check the role above, or create an account.`);
-      else if (status === 400) setError("That email and password don't match. Please try again.");
-      else setError(errorMessage(err, "We couldn't sign you in. Please try again."));
+      if (err.response?.status === 409 && err.response.data?.workspaces) {
+        setChoices(err.response.data.workspaces);
+      } else {
+        setError(errorMessage(err, "We couldn't sign you in. Please try again."));
+      }
       setLoading(false);
     }
+  };
+
+  const submit = (event) => {
+    event.preventDefault();
+    signIn();
   };
 
   return (
@@ -115,35 +100,20 @@ export default function Login() {
       caption="Events, hours, mentors and messages — all waiting in your workspace."
     >
       <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.035em] text-ink">Sign in to Synapsis</h1>
-      <p className="mt-2 text-[15px] text-muted">Choose your role, then use the email you registered with.</p>
+      <p className="mt-2 text-[15px] text-muted">Use the email you registered with. We&apos;ll open the right workspace for you.</p>
 
-      <fieldset className="mt-8">
-        <legend className="mb-2 text-[13px] font-semibold text-fg">Sign in as</legend>
-        <div className="grid grid-cols-3 gap-1 rounded-lg border border-line bg-canvas p-1 sm:grid-cols-5">
-          {ROLES.map((item) => (
-            <label
-              key={item.id}
-              className={cx(
-                "relative flex h-9 cursor-pointer items-center justify-center rounded-md text-[13px] font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-brand-600",
-                role === item.id ? "bg-ink text-white shadow-subtle" : "text-fg-2 hover:bg-paper hover:text-ink"
-              )}
-            >
-              <input
-                type="radio"
-                name="role"
-                value={item.id}
-                checked={role === item.id}
-                onChange={() => {
-                  setRole(item.id);
-                  setError("");
-                }}
-                className="sr-only"
-              />
-              {item.label}
-            </label>
-          ))}
+      {choices ? (
+        <div className="mt-8 rounded-lg border border-line bg-canvas p-4">
+          <p className="text-[13.5px] font-semibold text-fg">This email has more than one account. Which one?</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {choices.map((c) => (
+              <Button key={c.id} size="sm" variant="outline" disabled={loading} onClick={() => signIn(c.id)}>
+                {c.label}
+              </Button>
+            ))}
+          </div>
         </div>
-      </fieldset>
+      ) : null}
 
       {bannerMessage ? (
         <div role="alert" className="mt-6 flex gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] leading-snug text-red-800">
@@ -175,7 +145,7 @@ export default function Login() {
           required
         />
         <Button type="submit" size="lg" fullWidth loading={loading}>
-          {loading ? "Signing in" : `Sign in as ${current.label.toLowerCase()}`}
+          {loading ? "Signing in" : "Sign in"}
         </Button>
       </form>
 

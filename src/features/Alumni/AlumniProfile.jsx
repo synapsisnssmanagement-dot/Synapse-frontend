@@ -58,6 +58,7 @@ function ProfileForm({ alumni, onSaved }) {
       localStorage.setItem("name", values.name.trim());
       localStorage.setItem("email", values.email.trim());
       toast.success("Profile saved.");
+      window.dispatchEvent(new Event("synapsis:profile-updated"));
       onSaved(res.data?.updated || { ...alumni, ...values });
       setPhoto(null);
     } catch (error) {

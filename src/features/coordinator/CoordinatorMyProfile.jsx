@@ -45,6 +45,7 @@ function ProfileForm({ profile, onSaved }) {
     try {
       const res = await api.put("/api/coordinator/updateProfile", form);
       toast.success("Profile saved.");
+      window.dispatchEvent(new Event("synapsis:profile-updated"));
       localStorage.setItem("name", values.name.trim());
       onSaved({ ...profile, ...values, ...(res.data?.data || {}) });
       setPhoto(null);
