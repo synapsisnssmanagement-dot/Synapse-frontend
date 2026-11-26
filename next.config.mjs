@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   agentRules: false,
-  devIndicators: { position: "bottom-right" },
+  devIndicators: false,
   // Separate build directory for isolated E2E runs (default unchanged).
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   images: {

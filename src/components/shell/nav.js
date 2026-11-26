@@ -104,6 +104,7 @@ export const ROLE_NAV = {
       },
       {
         label: "Attendance & hours",
+        short: "Attendance",
         icon: CalendarCheck,
         items: [
           { label: "Field attendance", href: "/coordinatorlayout/fieldattendance", icon: UserCheck },
@@ -132,6 +133,7 @@ export const ROLE_NAV = {
       },
       {
         label: "Money & registers",
+        short: "Money",
         icon: Landmark,
         items: [
           { label: "Finance", href: "/coordinatorlayout/finance", icon: Landmark },
@@ -226,6 +228,7 @@ export const ROLE_NAV = {
       },
       {
         label: "My record",
+        short: "Record",
         icon: BookOpen,
         items: [
           { label: "Diary & hours", href: "/studentlayout/passbook", icon: BookOpen },
