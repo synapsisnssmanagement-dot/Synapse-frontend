@@ -4,28 +4,24 @@ import cx from "@/lib/cx";
 import Spinner from "./Spinner";
 
 const base =
-  "group/btn relative isolate inline-flex select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap font-semibold tracking-[-0.01em] transition-[color,background-color,border-color,box-shadow,transform] duration-300 ease-out-expo active:translate-y-px disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45";
-
-// Filled variants use a panel that sweeps up from the bottom on hover.
-const sweep =
-  "before:absolute before:inset-0 before:-z-10 before:origin-bottom before:scale-y-0 before:transition-transform before:duration-500 before:ease-out-expo hover:before:scale-y-100 focus-visible:before:scale-y-100";
+  "group/btn relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const variants = {
-  primary: cx("bg-brand text-ink before:bg-ink hover:text-paper focus-visible:text-paper", sweep),
-  dark: cx("bg-ink text-paper before:bg-brand hover:text-ink focus-visible:text-ink", sweep),
-  light: cx("bg-paper text-ink before:bg-brand", sweep),
-  outline: "border border-line-strong bg-paper text-fg hover:border-fg hover:bg-canvas",
-  "outline-dark": "border border-white/20 text-on-dark hover:border-white/60 hover:bg-white/5",
+  primary: "bg-brand-600 text-white shadow-[0_1px_2px_rgb(8_122_81/0.25),inset_0_1px_0_rgb(255_255_255/0.15)] hover:bg-brand-700",
+  dark: "bg-ink text-white hover:bg-ink-800",
+  light: "bg-paper text-ink shadow-subtle hover:bg-mint",
+  outline: "border border-line-strong bg-paper text-fg shadow-subtle hover:border-brand-600/50 hover:bg-mint/60",
+  "outline-dark": "border border-white/25 text-on-dark hover:border-white/60 hover:bg-white/10",
   ghost: "text-fg-2 hover:bg-mist hover:text-fg",
   danger: "bg-red-600 text-white hover:bg-red-700",
-  "danger-soft": "border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100",
+  "danger-soft": "bg-rose text-red-700 hover:bg-red-100",
 };
 
 const sizes = {
-  sm: "h-9 rounded-md px-3.5 text-[13px]",
-  md: "h-11 rounded-lg px-5 text-sm",
-  lg: "h-14 rounded-lg px-7 text-[15px]",
-  xl: "h-16 rounded-lg px-8 text-base",
+  sm: "h-9 rounded-lg px-3.5 text-[13px]",
+  md: "h-11 rounded-xl px-5 text-sm",
+  lg: "h-13 rounded-xl px-7 text-[15px]",
+  xl: "h-15 rounded-2xl px-8 text-base",
 };
 
 export default function Button({
@@ -77,6 +73,7 @@ export function IconButton({ label, icon: Icon, variant = "ghost", size = "md", 
     ghost: "text-fg-2 hover:bg-mist hover:text-fg",
     outline: "border border-line bg-paper text-fg-2 hover:border-line-strong hover:text-fg",
     dark: "text-on-dark/70 hover:bg-white/8 hover:text-white",
+    soft: "text-muted hover:bg-mist hover:text-fg",
   }[variant];
   return (
     <button
@@ -84,7 +81,7 @@ export function IconButton({ label, icon: Icon, variant = "ghost", size = "md", 
       aria-label={label}
       title={label}
       className={cx(
-        "relative inline-flex shrink-0 items-center justify-center rounded-lg transition-colors duration-200 disabled:pointer-events-none disabled:opacity-45",
+        "relative inline-flex shrink-0 items-center justify-center rounded-xl transition-colors duration-200 disabled:pointer-events-none disabled:opacity-45",
         dims,
         tone,
         className
@@ -93,7 +90,7 @@ export function IconButton({ label, icon: Icon, variant = "ghost", size = "md", 
     >
       <Icon aria-hidden="true" className="size-[18px]" />
       {badge ? (
-        <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-4 text-ink tabular">
+        <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white ring-2 ring-paper tabular">
           {badge > 9 ? "9+" : badge}
         </span>
       ) : null}

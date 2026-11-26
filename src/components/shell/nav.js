@@ -52,13 +52,11 @@ export const ROLE_NAV = {
     profile: "/adminpanel/adminprofile",
     notifications: true,
     groups: [
-      { label: "Overview", items: [{ label: "Dashboard", href: "/adminpanel", icon: LayoutGrid, exact: true }] },
+      { label: "Home", icon: LayoutGrid, items: [{ label: "Dashboard", href: "/adminpanel", icon: LayoutGrid, exact: true }] },
+      { label: "Approvals", icon: UserCheck, items: [{ label: "Pending approvals", href: "/adminpanel/pending", icon: UserCheck }] },
       {
-        label: "Approvals",
-        items: [{ label: "Pending approvals", href: "/adminpanel/pending", icon: UserCheck }],
-      },
-      {
-        label: "Directory",
+        label: "People",
+        icon: Users,
         items: [
           { label: "Students", href: "/adminpanel/allstudent", icon: GraduationCap },
           { label: "Teachers", href: "/adminpanel/allteachers", icon: Presentation },
@@ -68,12 +66,13 @@ export const ROLE_NAV = {
       },
       {
         label: "Institutions",
+        icon: Building2,
         items: [
-          { label: "Institutions", href: "/adminpanel/manageinstitute", icon: Building2 },
+          { label: "All institutions", href: "/adminpanel/manageinstitute", icon: Building2 },
           { label: "Add institution", href: "/adminpanel/createinstitution", icon: PenSquare },
         ],
       },
-      { label: "Community", items: [{ label: "Testimonials", href: "/adminpanel/testimonials", icon: Quote }] },
+      { label: "Testimonials", icon: Quote, items: [{ label: "Testimonials", href: "/adminpanel/testimonials", icon: Quote }] },
     ],
   },
   coordinator: {
@@ -85,36 +84,37 @@ export const ROLE_NAV = {
     fullBleed: ["/coordinatorlayout/chat"],
     groups: [
       {
-        label: "Overview",
+        label: "Home",
+        icon: LayoutGrid,
         items: [
           { label: "Dashboard", href: "/coordinatorlayout", icon: LayoutGrid, exact: true },
-          { label: "Today's workspace", href: "/coordinatorlayout/workspace", icon: ClipboardList },
-        ],
-      },
-      {
-        label: "Service",
-        items: [
-          { label: "Diary review", href: "/coordinatorlayout/diaryreview", icon: ClipboardCheck },
-          { label: "Field attendance", href: "/coordinatorlayout/fieldattendance", icon: UserCheck },
-          { label: "Attendance review", href: "/coordinatorlayout/attendancereview", icon: CalendarCheck },
-          { label: "Camp operations", href: "/coordinatorlayout/camps", icon: Tent },
-          { label: "Hours complaints", href: "/coordinatorlayout/complaints", icon: MessageSquareWarning },
-          { label: "Policies & units", href: "/coordinatorlayout/policies", icon: FileCog },
-          { label: "Institution settings", href: "/coordinatorlayout/settings", icon: Building2 },
+          { label: "Today", href: "/coordinatorlayout/workspace", icon: ClipboardList },
         ],
       },
       {
         label: "Events",
+        icon: CalendarRange,
         items: [
-          { label: "Projects", href: "/coordinatorlayout/projects", icon: FolderKanban },
-          { label: "Create event", href: "/coordinatorlayout/createevent", icon: CalendarPlus },
           { label: "My events", href: "/coordinatorlayout/myevents", icon: CalendarRange },
+          { label: "Create event", href: "/coordinatorlayout/createevent", icon: CalendarPlus },
+          { label: "Projects", href: "/coordinatorlayout/projects", icon: FolderKanban },
+          { label: "Camps", href: "/coordinatorlayout/camps", icon: Tent },
           { label: "Event reports", href: "/coordinatorlayout/eventreport", icon: FileBarChart },
-          { label: "Registers & reports", href: "/coordinatorlayout/reports", icon: FileText },
+        ],
+      },
+      {
+        label: "Attendance & hours",
+        icon: CalendarCheck,
+        items: [
+          { label: "Field attendance", href: "/coordinatorlayout/fieldattendance", icon: UserCheck },
+          { label: "Review attendance", href: "/coordinatorlayout/attendancereview", icon: CalendarCheck },
+          { label: "Diaries", href: "/coordinatorlayout/diaryreview", icon: ClipboardCheck },
+          { label: "Hours complaints", href: "/coordinatorlayout/complaints", icon: MessageSquareWarning },
         ],
       },
       {
         label: "People",
+        icon: Users,
         items: [
           { label: "Students", href: "/coordinatorlayout/managestudents", icon: GraduationCap },
           { label: "Volunteers", href: "/coordinatorlayout/managevolunteer", icon: Users },
@@ -122,20 +122,37 @@ export const ROLE_NAV = {
         ],
       },
       {
-        label: "Recognition",
+        label: "Certificates",
+        icon: Medal,
         items: [
           { label: "NSS certificates", href: "/coordinatorlayout/eligibility", icon: Medal },
-          { label: "Completion certificates", href: "/coordinatorlayout/completion", icon: ScrollText },
+          { label: "Completion", href: "/coordinatorlayout/completion", icon: ScrollText },
           { label: "Grace marks", href: "/coordinatorlayout/recommendgracemark", icon: Award },
+        ],
+      },
+      {
+        label: "Money & registers",
+        icon: Landmark,
+        items: [
+          { label: "Finance", href: "/coordinatorlayout/finance", icon: Landmark },
           { label: "Donations", href: "/coordinatorlayout/ManageDonation", icon: HandCoins },
-          { label: "Finance & registers", href: "/coordinatorlayout/finance", icon: Landmark },
+          { label: "Registers & reports", href: "/coordinatorlayout/reports", icon: FileText },
         ],
       },
       {
         label: "Community",
+        icon: MessagesSquare,
         items: [
-          { label: "Help requests", href: "/coordinatorlayout/requests", icon: HandHelping },
           { label: "Event chat", href: "/coordinatorlayout/chat", icon: MessagesSquare },
+          { label: "Help requests", href: "/coordinatorlayout/requests", icon: HandHelping },
+        ],
+      },
+      {
+        label: "Settings",
+        icon: FileCog,
+        items: [
+          { label: "Institution", href: "/coordinatorlayout/settings", icon: Building2 },
+          { label: "Policies & units", href: "/coordinatorlayout/policies", icon: FileCog },
         ],
       },
     ],
@@ -149,29 +166,38 @@ export const ROLE_NAV = {
     announcements: "/teacherLayout/announcement",
     fullBleed: ["/teacherLayout/teacherchat"],
     groups: [
-      { label: "Overview", items: [{ label: "Dashboard", href: "/teacherLayout", icon: LayoutGrid, exact: true }] },
+      { label: "Home", icon: LayoutGrid, items: [{ label: "Dashboard", href: "/teacherLayout", icon: LayoutGrid, exact: true }] },
       {
         label: "Events",
+        icon: CalendarRange,
         items: [
           { label: "My events", href: "/teacherLayout/myeventsteacher", icon: CalendarRange },
           { label: "Projects", href: "/teacherLayout/projects", icon: FolderKanban },
-          { label: "Attendance", href: "/teacherLayout/attendanceByTeacher", icon: CalendarCheck },
-          { label: "Diary review", href: "/teacherLayout/diaryreview", icon: ClipboardList },
-          { label: "Field attendance", href: "/teacherLayout/fieldattendance", icon: UserCheck },
-          { label: "Attendance review", href: "/teacherLayout/attendancereview", icon: ClipboardCheck },
           { label: "Camps", href: "/teacherLayout/camps", icon: Tent },
-          { label: "Attendance reports", href: "/teacherLayout/attendancepdf", icon: FileText },
+        ],
+      },
+      {
+        label: "Attendance",
+        icon: CalendarCheck,
+        items: [
+          { label: "Mark attendance", href: "/teacherLayout/attendanceByTeacher", icon: CalendarCheck },
+          { label: "Field attendance", href: "/teacherLayout/fieldattendance", icon: UserCheck },
+          { label: "Review", href: "/teacherLayout/attendancereview", icon: ClipboardCheck },
+          { label: "Diaries", href: "/teacherLayout/diaryreview", icon: ClipboardList },
+          { label: "Reports", href: "/teacherLayout/attendancepdf", icon: FileText },
         ],
       },
       {
         label: "Grace marks",
+        icon: Award,
         items: [
           { label: "Review requests", href: "/teacherLayout/approvegracebyteacher", icon: ClipboardCheck },
-          { label: "Assign grace marks", href: "/teacherLayout/assigngracemarks", icon: Award },
+          { label: "Assign", href: "/teacherLayout/assigngracemarks", icon: Award },
         ],
       },
       {
         label: "Community",
+        icon: Megaphone,
         items: [
           { label: "Announcements", href: "/teacherLayout/announcement", icon: Megaphone },
           { label: "Event chat", href: "/teacherLayout/teacherchat", icon: MessagesSquare },
@@ -188,33 +214,42 @@ export const ROLE_NAV = {
     announcements: "/studentlayout/announcement",
     fullBleed: ["/studentlayout/chatstudent", "/studentlayout/mentorshipchatlayout"],
     groups: [
-      { label: "Overview", items: [{ label: "Dashboard", href: "/studentlayout/dashboard", icon: LayoutGrid }] },
+      { label: "Home", icon: LayoutGrid, items: [{ label: "Dashboard", href: "/studentlayout/dashboard", icon: LayoutGrid }] },
       {
-        label: "Service",
+        label: "Events",
+        icon: CalendarRange,
         items: [
           { label: "My events", href: "/studentlayout/studentevents", icon: CalendarRange },
-          { label: "Attendance", href: "/studentlayout/studentattendance", icon: CalendarCheck },
           { label: "Check in", href: "/studentlayout/checkin", icon: MapPin },
-          { label: "Diary & passbook", href: "/studentlayout/passbook", icon: BookOpen },
           { label: "Special camps", href: "/studentlayout/camps", icon: Tent },
+        ],
+      },
+      {
+        label: "My record",
+        icon: BookOpen,
+        items: [
+          { label: "Diary & hours", href: "/studentlayout/passbook", icon: BookOpen },
+          { label: "Attendance", href: "/studentlayout/studentattendance", icon: CalendarCheck },
           { label: "Certificates", href: "/studentlayout/certificates", icon: ScrollText },
-          { label: "Add a memory", href: "/studentlayout/studentupload", icon: ImagePlus },
         ],
       },
       {
         label: "Mentorship",
+        icon: Sparkles,
         items: [
-          { label: "Find a mentor", href: "/studentlayout/mentorshiprequestbyvolunteer", icon: UserRoundSearch },
           { label: "My mentors", href: "/studentlayout/mymentors", icon: Sparkles },
-          { label: "Mentorship chat", href: "/studentlayout/mentorshipchatlayout", icon: MessageCircle },
+          { label: "Find a mentor", href: "/studentlayout/mentorshiprequestbyvolunteer", icon: UserRoundSearch },
+          { label: "Chat", href: "/studentlayout/mentorshipchatlayout", icon: MessageCircle },
         ],
       },
       {
         label: "Community",
+        icon: Megaphone,
         items: [
           { label: "Announcements", href: "/studentlayout/announcement", icon: Megaphone },
           { label: "Event chat", href: "/studentlayout/chatstudent", icon: MessagesSquare },
           { label: "Leaderboard", href: "/studentlayout/leaderboard", icon: Trophy },
+          { label: "Add a memory", href: "/studentlayout/studentupload", icon: ImagePlus },
         ],
       },
     ],
@@ -227,17 +262,19 @@ export const ROLE_NAV = {
     notifications: false,
     fullBleed: ["/alumnilayout/mentorshipchatlayout"],
     groups: [
-      { label: "Overview", items: [{ label: "Dashboard", href: "/alumnilayout/dashboard", icon: LayoutGrid }] },
+      { label: "Home", icon: LayoutGrid, items: [{ label: "Dashboard", href: "/alumnilayout/dashboard", icon: LayoutGrid }] },
       {
         label: "Mentorship",
+        icon: Users,
         items: [
           { label: "Mentees", href: "/alumnilayout/managementorship", icon: Users },
-          { label: "Mentorship chat", href: "/alumnilayout/mentorshipchatlayout", icon: MessageCircle },
+          { label: "Chat", href: "/alumnilayout/mentorshipchatlayout", icon: MessageCircle },
         ],
       },
-      { label: "Giving", items: [{ label: "Donations", href: "/alumnilayout/donations", icon: HandCoins }] },
+      { label: "Donations", icon: HandCoins, items: [{ label: "Donations", href: "/alumnilayout/donations", icon: HandCoins }] },
       {
         label: "Community",
+        icon: Quote,
         items: [
           { label: "Testimonials", href: "/alumnilayout/testimonials", icon: Quote },
           { label: "Feedback", href: "/alumnilayout/feedback", icon: PenSquare },
@@ -261,6 +298,10 @@ export function findCurrent(config, pathname) {
       if (isActive(item, pathname)) return { group, item };
     }
   }
-  if (pathname.startsWith(config.profile)) return { group: { label: "Account" }, item: { label: "Profile" } };
+  if (pathname.startsWith(config.profile)) return { group: { label: "Account", items: [] }, item: { label: "Profile" } };
   return null;
+}
+
+export function isGroupActive(group, pathname) {
+  return group.items.some((item) => isActive(item, pathname));
 }

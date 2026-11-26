@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/Dialog";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import PageHeader from "@/components/ui/PageHeader";
 import Panel from "@/components/ui/Panel";
+import cx from "@/lib/cx";
 import Progress from "@/components/ui/Progress";
 import StatCard from "@/components/ui/StatCard";
 import { EmptyState, ErrorState } from "@/components/ui/States";
@@ -273,35 +274,71 @@ export default function Passbook() {
             <StatCard label="Legacy (imported)" value={hours(d.summary.legacyMinutes)} unit="h" icon={BookOpen} footnote="From older attendance records" />
           </div>
 
-          <div className="mb-6 grid gap-4 lg:grid-cols-2">
+          <div className={cx("mb-6 grid gap-4", d.campProgress.length && "lg:grid-cols-[1.6fr_1fr]")}>
             {d.evaluations.length ? (
-              d.evaluations.map(({ policy, result }) => (
-                <Panel key={policy._id} title={policy.name} description={`${REQUIREMENT_LABEL[policy.requirementType]} · policy v${policy.version}${policy.verifiedByInstitution ? "" : " · not marked as verified by the institution"}`}>
-                  <div className="grid gap-4">
-                    {result.regularMinutesPerYear ? (
-                      <div>
-                        <p className="mb-2 text-[13px] text-fg-2">
-                          {result.yearsRequired} academic year{result.yearsRequired === 1 ? "" : "s"} of {hours(result.regularMinutesPerYear)} h{result.consecutiveYears ? ", consecutive" : ""} — {result.qualifyingYears.length} done
+              d.evaluations.map(({ policy, result }) => {
+                const steps = [];
+                if (result.regularMinutesPerYear) {
+                  steps.push({
+                    key: "years",
+                    done: result.qualifyingYears.length >= result.yearsRequired,
+                    title: `Regular service: ${hours(result.regularMinutesPerYear)} h a year for ${result.yearsRequired} year${result.yearsRequired === 1 ? "" : "s"}${result.consecutiveYears ? " in a row" : ""}`,
+                    note: `${result.qualifyingYears.length} of ${result.yearsRequired} done`,
+                    body: result.years.length ? (
+                      result.years.map((y) => <Progress key={y.year} className="mt-2" label={y.label} value={Math.min(y.minutes, result.regularMinutesPerYear)} max={result.regularMinutesPerYear} valueLabel={`${hours(y.minutes)} / ${hours(result.regularMinutesPerYear)} h`} />)
+                    ) : (
+                      <p className="mt-1 text-[13px] text-muted">No approved hours yet. Write a diary entry after each activity.</p>
+                    ),
+                  });
+                }
+                result.categories.forEach((c) =>
+                  steps.push({
+                    key: c.name,
+                    done: c.done >= c.required,
+                    title: c.name,
+                    note: `${formatMinutes(c.done)} / ${formatMinutes(c.required)}`,
+                    body: <Progress className="mt-2" value={Math.min(c.done, c.required)} max={c.required || 1} />,
+                  })
+                );
+                if (result.camp.required) {
+                  steps.push({ key: "camp", done: result.camp.met, title: `Special camp (${result.camp.requiredDays} days)`, note: result.camp.met ? "Complete" : "Not yet" });
+                }
+                const doneCount = steps.filter((st) => st.done).length;
+                return (
+                  <section key={policy._id} className="rounded-2xl border border-line/70 bg-paper p-5 shadow-subtle sm:p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-base font-semibold text-fg">Your NSS certificate progress</h2>
+                        <p className="mt-0.5 text-[13px] text-muted">
+                          {REQUIREMENT_LABEL[policy.requirementType]} · policy v{policy.version}
                         </p>
-                        {result.years.length ? (
-                          result.years.map((y) => <Progress key={y.year} className="mb-2" label={y.label} value={Math.min(y.minutes, result.regularMinutesPerYear)} max={result.regularMinutesPerYear} valueLabel={`${hours(y.minutes)} / ${hours(result.regularMinutesPerYear)} h`} />)
-                        ) : (
-                          <p className="text-[13px] text-muted">No verified regular service yet.</p>
-                        )}
                       </div>
+                      <span className={cx("rounded-full px-3 py-1 text-[12.5px] font-semibold", result.met ? "bg-mint text-brand-700" : "bg-sun text-amber-800")}>
+                        {result.met ? "Eligible" : `${doneCount} of ${steps.length} complete`}
+                      </span>
+                    </div>
+                    {!policy.verifiedByInstitution ? (
+                      <p className="mt-3 rounded-xl bg-sun px-3.5 py-2.5 text-[12.5px] text-amber-900">These rules are a draft and may change once your institution confirms them.</p>
                     ) : null}
-                    {result.categories.map((c) => (
-                      <Progress key={c.name} label={`Category: ${c.name}`} value={Math.min(c.done, c.required)} max={c.required || 1} valueLabel={`${formatMinutes(c.done)} / ${formatMinutes(c.required)}`} />
-                    ))}
-                    {result.camp.required ? (
-                      <p className="text-[13px] text-fg-2">
-                        Special camp ({result.camp.requiredDays} days): <strong>{result.camp.met ? "complete" : "not yet complete"}</strong>
-                      </p>
-                    ) : null}
-                    <p className="text-[13px] font-semibold text-fg">{result.met ? "All requirements in this policy are met." : "Requirements remaining — see above."}</p>
-                  </div>
-                </Panel>
-              ))
+                    <ol className="mt-4 grid gap-3">
+                      {steps.map((st) => (
+                        <li key={st.key} className="flex gap-3 rounded-xl bg-canvas p-3.5">
+                          <span className={cx("mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full", st.done ? "bg-brand text-white" : "border-2 border-line-strong bg-paper")}>
+                            {st.done ? <CheckCircle2 aria-hidden="true" className="size-4" /> : null}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                              <p className="text-[14px] font-semibold text-fg">{st.title}</p>
+                              <p className="tabular text-[12.5px] font-medium text-muted">{st.note}</p>
+                            </div>
+                            {st.body}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                );
+              })
             ) : (
               <Panel title="Requirements">
                 <p className="text-[13px] text-muted">Your institution has not activated a service policy yet, so no target is shown.</p>

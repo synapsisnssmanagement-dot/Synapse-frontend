@@ -19,6 +19,7 @@ import cx from "@/lib/cx";
 import { firstName, formatDate, formatNumber, greeting } from "@/lib/format";
 import { attentionItems, deliveredHours, participantCount, presentCount, sortEvents, teacherCount, useCoordinatorProfile, useMyEvents } from "./data";
 import useEventLifecycle from "./lifecycle";
+import SetupChecklist from "./SetupChecklist";
 
 const INSIGHT_KEY = "synapsis.coordinator.insight";
 
@@ -325,6 +326,8 @@ export default function CoordinatorDashboard() {
           </>
         }
       />
+
+      <SetupChecklist volunteers={d.totalVolunteers ?? 0} events={myEvents.length} />
 
       {events.status === "error" ? (
         <div className="mb-4">

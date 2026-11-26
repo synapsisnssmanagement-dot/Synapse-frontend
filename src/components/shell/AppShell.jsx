@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Drawer } from "vaul";
 import { Menu, Search } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
-import { useDialogBehaviour, useIsClient } from "@/components/ui/Dialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import useAuthGuard from "@/hooks/useAuthGuard";
 import api from "@/lib/api";
@@ -17,9 +15,9 @@ import cx from "@/lib/cx";
 import CommandPalette from "./CommandPalette";
 import NotificationsMenu from "./NotificationsMenu";
 import Sidebar from "./Sidebar";
-import { ROLE_NAV, findCurrent } from "./nav";
+import { ROLE_NAV, findCurrent, isActive } from "./nav";
 
-const COLLAPSE_KEY = "synapsis.sidebar.collapsed";
+const COLLAPSE_KEY = "synapsis.sidebar.collapsed.v2";
 
 function readStored(key) {
   try {
@@ -32,7 +30,7 @@ function readStored(key) {
 function ShellFrame() {
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas" aria-busy="true">
-      <div className="hidden w-(--shell-sidebar) shrink-0 bg-ink lg:block" />
+      <div className="hidden w-(--shell-sidebar) shrink-0 border-r border-line bg-paper lg:block" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="h-16 shrink-0 border-b border-line bg-paper" />
         <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10" role="status">
@@ -47,41 +45,48 @@ function ShellFrame() {
 }
 
 function MobileNav({ open, onClose, children }) {
-  const isClient = useIsClient();
-  const reduce = useReducedMotion();
-  const panelRef = useRef(null);
-  useDialogBehaviour(open, panelRef, onClose);
-  if (!isClient) return null;
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <div className="fixed inset-0 z-(--z-drawer) lg:hidden">
-          <motion.div
-            aria-hidden="true"
-            className="absolute inset-0 bg-ink/60"
-            onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation"
-            tabIndex={-1}
-            className="relative h-full w-[min(86vw,300px)] shadow-elevated outline-none"
-            initial={{ x: reduce ? 0 : "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: reduce ? 0 : "-100%" }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {children}
-          </motion.div>
-        </div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
+  return (
+    <Drawer.Root open={open} onOpenChange={(value) => (value ? null : onClose())} direction="left">
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-(--z-drawer) bg-ink/40 backdrop-blur-[2px] lg:hidden" />
+        <Drawer.Content
+          aria-describedby={undefined}
+          className="fixed inset-y-0 left-0 z-(--z-drawer) w-[min(86vw,300px)] shadow-elevated outline-none lg:hidden"
+        >
+          <Drawer.Title className="sr-only">Navigation</Drawer.Title>
+          {children}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
+function HubTabs({ group, pathname }) {
+  if (!group?.items || group.items.length < 2) return null;
+  return (
+    <nav aria-label={`${group.label} sections`} className="min-w-0 flex-1">
+      <ul className="scrollbar-quiet flex items-center gap-1 overflow-x-auto py-1">
+        {group.items.map((item) => {
+          const active = isActive(item, pathname);
+          const Icon = item.icon;
+          return (
+            <li key={item.href} className="shrink-0">
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cx(
+                  "flex h-9 items-center gap-2 rounded-full px-3.5 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
+                  active ? "bg-ink text-white shadow-subtle" : "text-muted hover:bg-mist hover:text-fg"
+                )}
+              >
+                <Icon aria-hidden="true" className={cx("size-4", active ? "text-brand" : "text-subtle")} />
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
@@ -158,38 +163,20 @@ function Workspace({ config, children }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-line bg-paper px-3 sm:gap-3 sm:px-6 lg:px-10">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-line/70 bg-paper px-3 sm:gap-3 sm:px-6 lg:px-10">
           <IconButton label="Open navigation" icon={Menu} onClick={() => setNavOpen(true)} className="lg:hidden" />
-          <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
-            <ol className="flex min-w-0 items-center gap-2 text-[13px]">
-              <li className="hidden shrink-0 text-muted sm:block">{config.label}</li>
-              {current?.group && current.group.label !== "Overview" ? (
-                <>
-                  <li aria-hidden="true" className="hidden text-subtle sm:block">
-                    /
-                  </li>
-                  <li className="hidden shrink-0 text-muted md:block">{current.group.label}</li>
-                  <li aria-hidden="true" className="hidden text-subtle md:block">
-                    /
-                  </li>
-                </>
-              ) : (
-                <li aria-hidden="true" className="hidden text-subtle sm:block">
-                  /
-                </li>
-              )}
-              <li aria-current="page" className="truncate font-semibold text-fg">
-                {current?.item.label || "Overview"}
-              </li>
-            </ol>
-          </nav>
+          {current?.group?.items?.length > 1 ? (
+            <HubTabs group={current.group} pathname={pathname} />
+          ) : (
+            <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">{current?.item.label || "Overview"}</p>
+          )}
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className="hidden h-9 w-60 items-center gap-2 rounded-lg border border-line bg-canvas px-3 text-[13px] text-muted transition-colors hover:border-line-strong hover:text-fg-2 md:flex"
+            className="hidden h-10 w-64 items-center gap-2 rounded-xl border border-transparent bg-mist px-3.5 text-[13px] text-muted transition-colors hover:border-line-strong hover:text-fg-2 md:flex"
           >
             <Search aria-hidden="true" className="size-4" />
-            Jump to a page
+            Search pages…
             <kbd className="ml-auto rounded border border-line bg-paper px-1.5 py-0.5 text-[10.5px] font-semibold text-muted">
               {isMac ? "⌘ K" : "Ctrl K"}
             </kbd>

@@ -3,12 +3,12 @@ import cx from "@/lib/cx";
 export default function Panel({ title, description, actions, children, className, bodyClassName, padded = true, as: Tag = "section", id }) {
   const titleId = id ? `${id}-title` : undefined;
   return (
-    <Tag id={id} aria-labelledby={title ? titleId : undefined} className={cx("min-w-0 rounded-xl border border-line bg-paper", className)}>
+    <Tag id={id} aria-labelledby={title ? titleId : undefined} className={cx("min-w-0 rounded-2xl border border-line/70 bg-paper shadow-subtle", className)}>
       {title || actions ? (
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5 sm:px-6">
           <div className="min-w-0">
             {title ? (
-              <h2 id={titleId} className="text-[15px] font-semibold tracking-[-0.015em] text-fg">
+              <h2 id={titleId} className="text-base font-semibold tracking-[-0.01em] text-fg">
                 {title}
               </h2>
             ) : null}
@@ -17,7 +17,7 @@ export default function Panel({ title, description, actions, children, className
           {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
         </div>
       ) : null}
-      <div className={cx(padded && "p-5", bodyClassName)}>{children}</div>
+      <div className={cx(padded && "p-5 sm:p-6", (title || actions) && padded && "pt-4 sm:pt-4", bodyClassName)}>{children}</div>
     </Tag>
   );
 }
