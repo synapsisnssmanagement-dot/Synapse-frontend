@@ -120,7 +120,7 @@ export default function PersonReview({ open, onClose, target, person, institutio
             <Detail label="Department">{target.department}</Detail>
             <Detail label="Graduation year">{target.graduationYear}</Detail>
             <Detail label="Talents">{Array.isArray(target.talents) ? target.talents.join(", ") : target.talents}</Detail>
-            <Detail label="Volunteer hours">{target.totalVolunteerHours ? `${formatNumber(target.totalVolunteerHours)} h` : null}</Detail>
+            <Detail label="Legacy hours (attendance-derived)">{target.totalVolunteerHours ? `${formatNumber(target.totalVolunteerHours)} h` : null}</Detail>
             <Detail label="Signed up">{formatDate(target.createdAt, "long")}</Detail>
           </dl>
 

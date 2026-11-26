@@ -57,7 +57,7 @@ export default function NssProgress() {
   const total = round(e.total);
   const thisYear = round(e.currentYear);
   const status = statusLine(e, target);
-  const camp = (e.camps || [])[0];
+  const camp = (e.camps || []).find((c) => c.complete) || null;
   const years = e.years || [];
 
   return (
@@ -125,7 +125,7 @@ export default function NssProgress() {
             <span>
               <span className="block font-semibold text-fg">One special camp</span>
               <span className="block text-muted">
-                {e.campDone && camp ? `Done — ${camp.title}${camp.date ? `, ${formatDate(camp.date)}` : ""}` : e.campDone ? "Done" : "Not yet attended"}
+                {e.campDone && camp ? `Done — ${camp.title}${camp.date ? `, ${formatDate(camp.date)}` : ""}` : e.campDone ? "Done" : (e.camps || []).length ? `Partial — ${Math.max(...e.camps.map((c) => c.daysAttended || 0))} of 7 days` : "Not yet attended"}
               </span>
             </span>
           </li>

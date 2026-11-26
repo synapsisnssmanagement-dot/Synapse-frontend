@@ -93,6 +93,16 @@ function RequestCard({ request: r, busy, onStatus }) {
           <Button size="sm" variant="ghost" icon={Undo2} loading={busy} onClick={() => onStatus(r, "new")}>
             Move back to new
           </Button>
+        ) : r.status === "accepted" ? (
+          r.project ? (
+            <Button size="sm" variant="outline" href={`/coordinatorlayout/projects/${r.project}`}>
+              View project
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" href={`/coordinatorlayout/projects?request=${r._id}`}>
+              Turn into a project
+            </Button>
+          )
         ) : null}
       </div>
     </li>

@@ -55,19 +55,30 @@ export default function VerifyCertificate() {
           <div className="rounded-2xl border border-line bg-paper p-8 text-center">
             <p className="text-[14.5px] text-muted">We couldn&apos;t check this certificate right now. Try again in a moment.</p>
           </div>
+        ) : result.data && result.data.status && result.data.status !== "issued" ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center" role="alert">
+            <ShieldX aria-hidden="true" className="mx-auto size-8 text-red-600" />
+            <p className="mt-4 font-semibold text-red-700">{result.data.status === "superseded" ? "This certificate was replaced" : "This certificate has been revoked"}</p>
+            <p className="mt-2 text-[13.5px] text-red-700/80">
+              Record {result.data.certId} for {result.data.studentName} is no longer valid.
+              {result.data.replacedBy ? ` The current certificate is ${result.data.replacedBy}.` : ""}
+            </p>
+          </div>
         ) : result.data ? (
           <div className="overflow-hidden rounded-2xl border border-brand/25 bg-paper">
             <div className="flex items-center gap-3 bg-mint px-6 py-5">
               <ShieldCheck aria-hidden="true" className="size-6 shrink-0 text-brand-700" />
               <div>
                 <p className="font-semibold text-brand-700">Certificate verified</p>
-                <p className="text-[12.5px] text-brand-700/70">Issued through the Synapsis NSS platform&mdash;verified against our records.</p>
+                <p className="text-[12.5px] text-brand-700/70">Matches an issued record on the Synapsis NSS platform. This checks the record only; it is not a government verification.</p>
               </div>
             </div>
             <div className="px-6 py-2">
               <Row icon={User} label="Volunteer" value={result.data.studentName} />
               <Row icon={Building2} label="Department" value={result.data.department} />
-              <Row icon={Award} label="Event" value={result.data.eventTitle} />
+              <Row icon={Award} label={result.data.kind === "nss_completion" ? "Certificate" : "Event"} value={result.data.kind === "nss_completion" ? result.data.title : result.data.eventTitle} />
+              {result.data.kind === "nss_completion" ? <Row icon={Award} label="Requirements" value={result.data.policy} /> : null}
+              {result.data.kind === "nss_completion" ? <Row icon={Clock3} label="Verified service" value={(result.data.years || []).map((y) => `${y.label}: ${y.hours} h`).join(" · ") || null} /> : null}
               <Row icon={Calendar} label="Event date" value={result.data.eventDate ? formatDate(result.data.eventDate) : null} />
               <Row icon={Clock3} label="Credited hours" value={result.data.hours != null ? `${result.data.hours} hours` : null} />
               <Row icon={Building2} label="Institution" value={result.data.institution} />

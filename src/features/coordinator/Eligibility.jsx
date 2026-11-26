@@ -56,13 +56,14 @@ export default function Eligibility() {
 
   const exportCsv = () =>
     downloadCsv("nss-certificate-eligibility.csv", [
-      ["name", "email", "department", "total hours", `hours ${data.data?.currentYear || "this year"}`, "special camp", "eligible", "behind pace"],
-      ...all.map((v) => [v.name, v.email, v.department || "", v.total, v.currentYear, v.campDone ? "yes" : "no", v.eligible ? "yes" : "no", v.behindPace ? "yes" : "no"]),
+      ["name", "email", "department", "verified hours", "legacy hours", `hours ${data.data?.currentYear || "this year"}`, "special camp", "eligible", "behind pace"],
+      ...all.map((v) => [v.name, v.email, v.department || "", v.total, v.legacy?.total || 0, v.currentYear, v.campDone ? "yes" : "no", v.eligible ? "yes" : "no", v.behindPace ? "yes" : "no"]),
     ]);
 
   const columns = [
     { key: "name", header: "Volunteer", sortable: true, primary: true, render: (r) => <Identity name={r.name} email={r.department || r.email} src={photoOf(r)} /> },
-    { key: "total", header: "NSS hours", sortable: true, render: (r) => <HoursBar value={r.total} target={rules.targetHours} /> },
+    { key: "legacyTotal", header: "Legacy hours", sortable: true, sortValue: (r) => r.legacy?.total || 0, render: (r) => <span className="tabular text-muted">{formatNumber(Math.round(r.legacy?.total || 0))}</span> },
+    { key: "total", header: "Verified hours", sortable: true, render: (r) => <HoursBar value={r.total} target={rules.targetHours} /> },
     {
       key: "currentYear",
       header: `This year (${data.data?.currentYear || ""})`,
@@ -117,7 +118,11 @@ export default function Eligibility() {
       <PageHeader
         eyebrow="Recognition"
         title="NSS certificates"
-        description={`The NSS certificate needs ${rules.targetHours} hours over two years (${rules.yearlyHours} a year) and one special camp. Hours here are counted from attendance, so they always match the record.`}
+        description={
+          rules.policy
+            ? `Verified (approved) service measured against ${rules.policy.name} v${rules.policy.version}: ${rules.yearlyHours} h a year. Legacy attendance-derived hours are shown separately and do not count unless the policy says so.`
+            : "No service policy is active, so eligibility cannot be confirmed. Set one up under Policies & units. Legacy attendance-derived hours are shown for reference."
+        }
         actions={
           <Button variant="outline" icon={Download} onClick={exportCsv} disabled={!all.length}>
             Export CSV

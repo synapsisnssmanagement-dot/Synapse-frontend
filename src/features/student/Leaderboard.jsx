@@ -50,8 +50,9 @@ export default function Leaderboard() {
                 </div>
                 {s.level ? <LevelBadge level={s.level} size="sm" /> : null}
                 <span className="tabular w-20 shrink-0 text-right text-[14.5px] font-semibold text-fg">
-                  {s.totalVolunteerHours || 0}
-                  <span className="ml-1 text-[11.5px] font-normal text-subtle">hrs</span>
+                  {s.verifiedHours ?? 0}
+                  <span className="ml-1 text-[11.5px] font-normal text-subtle">verified hrs</span>
+                  {s.legacyHours ? <span className="block text-[11px] font-normal text-subtle">{s.legacyHours} legacy</span> : null}
                 </span>
               </li>
             );

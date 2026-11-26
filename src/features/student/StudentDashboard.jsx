@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import useVerifiedHours from "@/features/ops/useVerifiedHours";
 import { Award, CalendarRange, Clock3, MapPin, ScrollText, Trophy } from "lucide-react";
 import { LevelBadge, StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -23,7 +24,7 @@ function Journey({ hours }) {
     <section aria-labelledby="journey-title" className="flex flex-col justify-between rounded-2xl bg-ink p-6 text-on-dark sm:p-7">
       <div>
         <p id="journey-title" className="eyebrow text-on-dark/55">
-          Hours credited
+          Verified hours
         </p>
         <p className="tabular mt-5 text-[clamp(3.25rem,6vw,4.75rem)] font-semibold leading-none tracking-[-0.05em] text-brand">
           {formatNumber(Math.round(hours * 10) / 10)}
@@ -41,7 +42,7 @@ function Journey({ hours }) {
           label={next ? `Next: ${next.name}` : "Highest level reached"}
           valueLabel={next ? `${Math.max(0, Math.ceil(next.minHours - hours))} h to go` : "Platinum"}
         />
-        <p className="mt-4 text-[13px] leading-relaxed text-on-dark/55">Hours are credited when an event is completed and you were marked present.</p>
+        <p className="mt-4 text-[13px] leading-relaxed text-on-dark/55">Hours count once a supervisor approves your diary entry. See Diary &amp; passbook for pending and legacy hours.</p>
       </div>
     </section>
   );
@@ -50,6 +51,7 @@ function Journey({ hours }) {
 export default function StudentDashboard() {
   const dashboard = useResource(() => api.get("/api/students/dashboard").then((res) => res.data?.dashboard || null), []);
   const profile = useStudentProfile();
+  const verifiedHours = useVerifiedHours();
 
   if (dashboard.loading) return <DashboardSkeleton />;
   if (dashboard.status === "error" || !dashboard.data) {
@@ -57,7 +59,7 @@ export default function StudentDashboard() {
   }
 
   const { student, stats = {}, awards = [], assignedEvents = [] } = dashboard.data;
-  const credited = Number(profile.data?.totalVolunteerHours) || 0;
+  const credited = verifiedHours.verified;
   const upcoming = sortEvents(assignedEvents.filter((e) => e.status === "Upcoming" || e.status === "Ongoing")).slice(0, 4);
 
   return (

@@ -89,7 +89,7 @@ export default function Directory({ role }) {
       ? [
           {
             key: "totalVolunteerHours",
-            header: "Service",
+            header: "Legacy hours",
             sortable: true,
             sortValue: (row) => Number(row.totalVolunteerHours) || 0,
             render: (row) => (

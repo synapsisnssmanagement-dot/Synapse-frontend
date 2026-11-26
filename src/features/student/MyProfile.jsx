@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import useVerifiedHours from "@/features/ops/useVerifiedHours";
 import { Building2, Phone, Sparkles, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import Avatar from "@/components/ui/Avatar";
@@ -103,8 +104,9 @@ function ProfileForm({ student, onSaved }) {
 
 export default function MyProfile() {
   const profile = useStudentProfile();
+  const verifiedHours = useVerifiedHours();
   const s = profile.data;
-  const hours = Number(s?.totalVolunteerHours) || 0;
+  const hours = verifiedHours.verified;
   const { current, next, pct } = levelProgress(hours);
 
   return (

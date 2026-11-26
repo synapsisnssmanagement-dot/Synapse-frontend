@@ -269,7 +269,7 @@ export default function AdminDashboard() {
             footnote={`${formatNumber(s.coordinator?.active || 0)} active`}
           />
           <StatCard align="bottom" label="Alumni" value={s.alumni?.total || 0} icon={PEOPLE.alumni.icon} footnote={`${formatNumber(s.alumni?.active || 0)} active`} />
-          <StatCard align="bottom" label="Hours contributed" value={formatNumber(s.hours?.total || 0)} icon={Clock3} footnote="across every institution" />
+          <StatCard align="bottom" label="Verified service hours" value={formatNumber(s.hours?.total || 0)} icon={Clock3} footnote={`Approved ledger service, all institutions${s.hours?.legacy ? ` · ${formatNumber(s.hours.legacy)} h legacy (attendance-derived)` : ""}`} />
           <StatCard align="bottom" label="Donations raised" value={formatCurrency(s.donation?.total || 0)} icon={HandCoins} footnote={`${formatNumber(s.donation?.count || 0)} gifts`} />
         </div>
       </div>
