@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/States";
 import { useSocket } from "@/context/SocketContext";
 import useResource from "@/hooks/useResource";
+import VenueSetup from "@/features/ops/VenueSetup";
 import api, { errorMessage } from "@/lib/api";
 import cx from "@/lib/cx";
 import { formatDate, photoOf } from "@/lib/format";
@@ -31,6 +32,7 @@ function locate() {
 }
 
 function VenuePin({ event, onSaved }) {
+  const [mapOpen, setMapOpen] = useState(false);
   const [radius, setRadius] = useState(String(event.geo?.radius || 300));
   const [busy, setBusy] = useState(false);
   const pinned = event.geo?.lat != null;
@@ -77,12 +79,16 @@ function VenuePin({ event, onSaved }) {
         <Button size="sm" variant="light" icon={MapPin} loading={busy} onClick={pinHere}>
           {pinned ? "Re-pin here" : "Pin venue here"}
         </Button>
+        <Button size="sm" variant="outline-dark" icon={MapPin} disabled={busy} onClick={() => setMapOpen(true)}>
+          On the map
+        </Button>
         {pinned ? (
           <Button size="sm" variant="ghost" className="text-on-dark/70 hover:text-white" disabled={busy} onClick={() => save(null)}>
             Turn off
           </Button>
         ) : null}
       </div>
+      {mapOpen ? <VenueSetup open event={event} onClose={() => setMapOpen(false)} onSaved={onSaved} /> : null}
     </div>
   );
 }

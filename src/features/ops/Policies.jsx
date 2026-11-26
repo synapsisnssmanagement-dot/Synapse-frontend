@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Building2, FileCog, UserPlus } from "lucide-react";
+import { Building2, FileCog, TriangleAlert, UserPlus } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { ConfirmDialog, Modal } from "@/components/ui/Dialog";
 import { Checkbox, Input, Select, Textarea } from "@/components/ui/Field";
@@ -15,6 +16,11 @@ import api, { errorMessage, getList } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { REQUIREMENT_LABEL, StateBadge, hours } from "./shared";
 
+// The built-in template's name carries a "(DRAFT — requires institutional
+// review)" label. It is shown as a separate warning badge instead, so an
+// active policy never reads as a draft.
+const policyName = (name = "") => name.replace(/\s*\(DRAFT[^)]*\)\s*/i, " ").trim() || name;
+
 function PolicyForm({ open, onClose, onSaved, base }) {
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +28,7 @@ function PolicyForm({ open, onClose, onSaved, base }) {
   if (open && !f && base) {
     setF({
       family: base.family,
-      name: base.name,
+      name: policyName(base.name),
       purpose: base.purpose || "",
       requirementType: base.requirementType,
       sourceReference: base.sourceReference || "",
@@ -244,65 +250,130 @@ export default function Policies() {
     <>
       <PageHeader eyebrow="Setup" title="Policies, units & enrolment" description="Service targets come from versioned policies you configure and verify. The built-in template is an unverified draft, not an official preset." actions={<Button variant="dark" icon={FileCog} onClick={newFromTemplate}>New policy from template</Button>} />
 
-      <Panel title="Service policies" className="mb-6" padded={false}>
+      <Panel title="Service policies" description="The rules used to measure volunteers' service. Active versions are locked; change a rule by creating a new version." className="mb-6" padded={false}>
         {policies.status === "error" ? (
           <ErrorState error={policies.error} onRetry={policies.reload} />
         ) : !policies.data ? (
           <TableSkeleton rows={3} />
         ) : policies.data.length ? (
-          <ul>
-            {policies.data.map((p) => (
-              <li key={p._id} className="flex flex-col gap-2 border-b border-line px-5 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-medium text-fg">
-                    {p.name} <span className="text-muted">v{p.version}</span>
-                  </p>
-                  <p className="text-[13px] text-muted">
-                    {REQUIREMENT_LABEL[p.requirementType]} · from {formatDate(p.effectiveFrom)}
-                    {p.effectiveTo ? ` to ${formatDate(p.effectiveTo)}` : ""} · {hours(p.rules.regularMinutesPerYear)} h × {p.rules.yearsRequired} yr
-                    {p.rules.camp?.required ? ` + ${p.rules.camp.requiredDays}-day camp` : ""} · source: {p.sourceReference || "none"}
-                  </p>
-                  <p className="text-[13px] text-fg-2">Reason: {p.changeReason}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StateBadge state={p.status} />
-                  <Button size="sm" variant="outline" onClick={() => setBase(p)}>
-                    New version
-                  </Button>
-                  {p.status === "draft" ? (
-                    <Button size="sm" variant="dark" onClick={() => setActivate(p)}>
-                      Activate
-                    </Button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
+          <ul className="divide-y divide-line">
+            {policies.data.map((p) => {
+              const chips = [
+                `${hours(p.rules.regularMinutesPerYear)} h per year`,
+                `${p.rules.yearsRequired} year${p.rules.yearsRequired === 1 ? "" : "s"}${p.rules.consecutiveYears && p.rules.yearsRequired > 1 ? ", consecutive" : ""}`,
+                p.rules.camp?.required ? `${p.rules.camp.requiredDays}-day camp` : "No camp required",
+                ...(p.rules.categories || []).map((c) => `${c.name}: ${hours(c.minMinutes)} h`),
+              ];
+              return (
+                <li key={p._id} className={`flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between ${p.status === "retired" ? "opacity-70" : ""}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-[15px] font-semibold text-fg">{policyName(p.name)}</h3>
+                      <span className="rounded-md bg-mist px-1.5 py-0.5 font-mono text-[12px] font-semibold text-fg-2">v{p.version}</span>
+                      <StateBadge state={p.status} />
+                      {p.status !== "retired" && !p.verifiedByInstitution ? (
+                        <Badge tone="warning" icon={TriangleAlert}>
+                          Not confirmed against official documents
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-[13px] text-muted">{REQUIREMENT_LABEL[p.requirementType]}</p>
+                    <ul className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Requirements">
+                      {chips.map((c) => (
+                        <li key={c} className="rounded-full border border-line bg-canvas px-2.5 py-1 text-[12.5px] font-medium text-fg-2">
+                          {c}
+                        </li>
+                      ))}
+                    </ul>
+                    <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-muted">
+                      <div>
+                        <dt className="inline">Effective: </dt>
+                        <dd className="inline text-fg-2">
+                          {formatDate(p.effectiveFrom)}
+                          {p.effectiveTo ? ` – ${formatDate(p.effectiveTo)}` : " onwards"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="inline">Source: </dt>
+                        <dd className="inline text-fg-2">{p.sourceReference || "not given"}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline">Reason: </dt>
+                        <dd className="inline text-fg-2">{p.changeReason}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {p.status === "draft" ? (
+                      <Button size="sm" variant="dark" onClick={() => setActivate(p)}>
+                        Activate
+                      </Button>
+                    ) : null}
+                    {p.status !== "retired" ? (
+                      <Button size="sm" variant="outline" onClick={() => setBase({ ...p, name: policyName(p.name) })}>
+                        New version
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <EmptyState icon={FileCog} title="No policies yet" description="Create one from the draft template and check it against your NSS documents." />
         )}
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="NSS units" description="An institution can run several units.">
-          <ul className="mb-4 grid gap-1 text-[14px]">
-            {(units.data || []).map((u) => (
-              <li key={u._id}>
-                <strong>{u.code}</strong> — {u.name} ({u.level === "higher_secondary" ? "Higher secondary" : "College"})
-              </li>
-            ))}
-            {units.data && !units.data.length ? <li className="text-muted">No units yet.</li> : null}
-          </ul>
-          <form onSubmit={addUnit} className="grid gap-3 sm:grid-cols-3">
-            <Input label="Unit name" required value={unit.name} onChange={(e) => setUnit({ ...unit, name: e.target.value })} />
-            <Input label="Unit code" required value={unit.code} onChange={(e) => setUnit({ ...unit, code: e.target.value })} />
-            <Select label="Level" value={unit.level} onChange={(e) => setUnit({ ...unit, level: e.target.value })}>
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Panel title="NSS units" description="An institution can run several units, each with its own code." padded={false}>
+          {units.status === "error" ? (
+            <div className="p-5">
+              <ErrorState error={units.error} onRetry={units.reload} size="sm" />
+            </div>
+          ) : !units.data ? (
+            <div className="p-5">
+              <TableSkeleton rows={2} columns={2} />
+            </div>
+          ) : units.data.length ? (
+            <ul className="divide-y divide-line">
+              {units.data.map((u) => {
+                const enrolled = (enrolments.data || []).filter((e) => String(e.unit?._id || e.unit) === String(u._id) && e.status !== "withdrawn").length;
+                return (
+                  <li key={u._id} className="flex items-center gap-3 px-5 py-3.5">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-mint text-brand-700" aria-hidden="true">
+                      <Building2 className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14.5px] font-semibold text-fg">{u.name}</p>
+                      <p className="text-[13px] text-muted">
+                        {u.level === "higher_secondary" ? "Higher secondary (XI/XII)" : "College"} · {enrolled} volunteer{enrolled === 1 ? "" : "s"} enrolled
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-md border border-line bg-canvas px-2 py-1 font-mono text-[12.5px] font-semibold text-fg-2">{u.code}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="p-5">
+              <EmptyState icon={Building2} size="sm" title="No units yet" description="Add your first NSS unit below." />
+            </div>
+          )}
+          <form onSubmit={addUnit} className="grid gap-3 border-t border-line bg-canvas/60 p-5 sm:grid-cols-2" aria-labelledby="add-unit-heading">
+            <h3 id="add-unit-heading" className="text-[13.5px] font-semibold text-fg sm:col-span-2">
+              Add a unit
+            </h3>
+            <Input label="Unit name" required placeholder="e.g. NSS Unit 2" value={unit.name} onChange={(e) => setUnit({ ...unit, name: e.target.value })} />
+            <Input label="Unit code" required placeholder="e.g. U2" maxLength={40} value={unit.code} onChange={(e) => setUnit({ ...unit, code: e.target.value.toUpperCase() })} />
+            <Select label="Level" value={unit.level} onChange={(e) => setUnit({ ...unit, level: e.target.value })} containerClassName="sm:col-span-2">
               <option value="college">College</option>
               <option value="higher_secondary">Higher secondary (XI/XII)</option>
             </Select>
-            <Button type="submit" variant="outline" icon={Building2} className="sm:col-span-3">
-              Add unit
-            </Button>
+            <div className="flex justify-end sm:col-span-2">
+              <Button type="submit" variant="dark" icon={Building2} disabled={!unit.name.trim() || !unit.code.trim()}>
+                Add unit
+              </Button>
+            </div>
           </form>
         </Panel>
         <Panel title="Enrol a volunteer">

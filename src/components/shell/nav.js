@@ -21,6 +21,7 @@ import {
   Images,
   Landmark,
   LayoutGrid,
+  MapPin,
   Medal,
   Megaphone,
   MessageCircle,
@@ -193,6 +194,7 @@ export const ROLE_NAV = {
         items: [
           { label: "My events", href: "/studentlayout/studentevents", icon: CalendarRange },
           { label: "Attendance", href: "/studentlayout/studentattendance", icon: CalendarCheck },
+          { label: "Check in", href: "/studentlayout/checkin", icon: MapPin },
           { label: "Diary & passbook", href: "/studentlayout/passbook", icon: BookOpen },
           { label: "Special camps", href: "/studentlayout/camps", icon: Tent },
           { label: "Certificates", href: "/studentlayout/certificates", icon: ScrollText },

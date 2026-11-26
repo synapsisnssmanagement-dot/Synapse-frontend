@@ -19,6 +19,7 @@ import api, { errorMessage } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/format";
 import { isPast, participantCount, presentCount, sortEvents, teacherCount, useMyEvents } from "./data";
 import useEventLifecycle from "./lifecycle";
+import VenueSetup from "@/features/ops/VenueSetup";
 
 const FILTERS = [
   { id: "Upcoming", label: "Upcoming" },
@@ -227,12 +228,15 @@ function ImpactModal({ event, onClose, onSaved }) {
   );
 }
 
-function DetailDrawer({ event, open, onClose, onEdit, onImpact, lifecycle }) {
+function DetailDrawer({ event, open, onClose, onEdit, onImpact, lifecycle, onVenueSaved }) {
+  const [venueOpen, setVenueOpen] = useState(false);
   const volunteers = (event?.participants || []).filter((p) => p && typeof p === "object");
   const teachers = (event?.assignedTeacher || []).filter((t) => t && typeof t === "object");
   const cover = event?.images?.[0]?.url;
 
   return (
+    <>
+    {event && venueOpen ? <VenueSetup key={event._id} open={venueOpen} event={event} onClose={() => setVenueOpen(false)} onSaved={() => onVenueSaved?.()} /> : null}
     <Drawer
       open={open}
       onClose={onClose}
@@ -255,6 +259,11 @@ function DetailDrawer({ event, open, onClose, onEdit, onImpact, lifecycle }) {
             {event.status === "Completed" ? (
               <Button variant="outline" icon={Sprout} onClick={() => onImpact(event)}>
                 {event.impact?.length ? "Edit impact" : "Record impact"}
+              </Button>
+            ) : null}
+            {event.status !== "Completed" ? (
+              <Button variant="outline" icon={MapPin} onClick={() => setVenueOpen(true)}>
+                {event.geo?.lat != null ? `Venue · ${event.geo.radius} m` : "Venue & range"}
               </Button>
             ) : null}
             {event.status !== "Completed" ? (
@@ -376,6 +385,7 @@ function DetailDrawer({ event, open, onClose, onEdit, onImpact, lifecycle }) {
         </div>
       ) : null}
     </Drawer>
+    </>
   );
 }
 
@@ -469,6 +479,7 @@ export default function MyEvents() {
       </div>
 
       <DetailDrawer
+        onVenueSaved={events.reload}
         event={open}
         open={Boolean(open)}
         onClose={() => setOpenId(null)}
